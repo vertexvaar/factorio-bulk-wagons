@@ -1,4 +1,5 @@
 local shared = require("shared")
+local graphics = require("prototypes.graphics")
 
 local slots = settings.startup["bulk-wagons-wagon-slots"].value
 
@@ -13,6 +14,12 @@ wagon.minable = { mining_time = 0.5, result = shared.wagon }
 wagon.color = { r = 0.56, g = 0.23, b = 0.15, a = 1 }
 wagon.allow_manual_color = true
 wagon.factoriopedia_simulation = nil
+if graphics.wagon_pictures() then
+  wagon.pictures = graphics.wagon_pictures()
+  -- an open hopper has no side doors
+  wagon.horizontal_doors = nil
+  wagon.vertical_doors = nil
+end
 
 local item = table.deepcopy(data.raw["item-with-entity-data"]["cargo-wagon"])
 item.name = shared.wagon
@@ -29,7 +36,8 @@ for _, planet in pairs(shared.active_planets(mods)) do
     variant.name = shared.wagon_name(planet)
     variant.placeable_by = { item = shared.wagon, count = 1 }
     variant.hidden_in_factoriopedia = true
-    variant.pictures.rotated.layers[1].tint = shared.placeholder_tint[planet]
+    variant.pictures = graphics.wagon_pictures(planet) or variant.pictures
+    if not graphics.wagon_pictures() then variant.pictures.rotated.layers[1].tint = shared.placeholder_tint[planet] end
     data:extend({ variant })
   end
 end

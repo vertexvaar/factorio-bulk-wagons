@@ -44,9 +44,10 @@ shared.placeholder_tint = {
   aquilo = { 0.7, 0.9, 1 },
 }
 
-function shared.wagon_name(planet)
-  return with_planet(shared.wagon, planet)
-end
+-- Hidden inventory container of a station, one per rail direction.
+function shared.store_name(base, vertical) return base .. (vertical and "-store-v" or "-store-h") end
+
+function shared.wagon_name(planet) return with_planet(shared.wagon, planet) end
 
 -- Rotates a vector clockwise by (variant - 1) quarter turns.
 function shared.rotate(vec, variant)
@@ -58,9 +59,7 @@ function shared.rotate(vec, variant)
 end
 
 -- Rail runs north-south for odd variants.
-function shared.rail_is_vertical(variant)
-  return variant % 2 == 1
-end
+function shared.rail_is_vertical(variant) return variant % 2 == 1 end
 
 -- Position of the built-in belt port relative to the station centre (variant 1).
 shared.port_offset = { 2.5, -0.5 }

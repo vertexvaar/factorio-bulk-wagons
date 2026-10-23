@@ -81,7 +81,9 @@ local function setup_vulcanus(s)
   rail_line(surface, true, 1, -41, 41)
   s.wagon_v = train(surface, true, 1, -20, -13)
   s.pit_v = surface.create_entity({ name = "bulk-unloading-pit", position = { 1, -13 }, force = "player", raise_built = true })
-  if not (s.pit_v and s.pit_v.valid) then s.pit_v = surface.find_entities_filtered({ type = "container", position = { 1, -13 } })[1] end
+  if not (s.pit_v and s.pit_v.valid) then
+    s.pit_v = surface.find_entities_filtered({ type = "simple-entity-with-owner", position = { 1, -13 } })[1]
+  end
   report(s.wagon_v.name == "bulk-wagon-vulcanus", "wagon becomes Vulcanus variant", s.wagon_v.name)
   report(s.pit_v.name == "bulk-unloading-pit-vulcanus", "pit becomes Vulcanus variant", s.pit_v.name)
   report(#s.wagon_v.train.carriages == 2, "swapped wagon stays coupled", #s.wagon_v.train.carriages .. " carriages")
@@ -116,7 +118,7 @@ local function setup()
   rail_line(surface, true, 21, -41, 41)
   s.wagon_b = train(surface, true, 21, -20, -13)
   s.loader = surface.create_entity({ name = "bulk-loading-station", position = { 21, -13 }, force = "player", raise_built = true })
-  local station_inv = s.loader.get_inventory(defines.inventory.chest)
+  local station_inv = remote.call("bulk-wagons", "get_inventory", s.loader)
   station_inv.insert({ name = "coal", count = 200 })
   station_inv.insert({ name = "iron-plate", count = 5 })
   s.in_belts = belt_run(surface, { 30.5, -13.5 }, { -1, 0 }, 7, defines.direction.west)
@@ -148,7 +150,7 @@ local function setup()
     and s.aligned.position.x == 7 and s.aligned.position.y == 31, "station turns and centres on rail",
     s.aligned and s.aligned.valid and (s.aligned.name .. " at " .. s.aligned.position.x .. "," .. s.aligned.position.y) or "gone")
   local ports = surface.find_entities_filtered({ name = "bulk-station-port", area = { { 4, 28 }, { 10, 36 } } })
-  report(#ports == 1 and ports[1].loader_container == s.aligned, "aligned station has its port", #ports .. " ports")
+  report(#ports == 1 and ports[1].loader_container ~= nil and ports[1].loader_container.name == "bulk-loading-station-store-h", "aligned station has its port", #ports .. " ports")
 
   if game.planets.vulcanus then setup_vulcanus(s) end
 
@@ -187,7 +189,7 @@ local function check()
   describe()
   local s = storage.scene
   local wagon_a = s.wagon_a.get_inventory(defines.inventory.cargo_wagon)
-  local pit = s.pit.get_inventory(defines.inventory.chest)
+  local pit = remote.call("bulk-wagons", "get_inventory", s.pit)
   report(count(wagon_a, "iron-plate") == 0, "forbidden item removed from wagon", count(wagon_a, "iron-plate") .. " left")
   report(count(wagon_a, "iron-ore") == 0, "wagon A emptied into pit", count(wagon_a, "iron-ore") .. " left")
   local on_belt = line_count(s.out_belts, "iron-ore")
@@ -195,7 +197,7 @@ local function check()
   report(count(pit, "iron-ore") + on_belt <= 500, "no items duplicated", (count(pit, "iron-ore") + on_belt) .. " total")
 
   local wagon_b = s.wagon_b.get_inventory(defines.inventory.cargo_wagon)
-  local station = s.loader.get_inventory(defines.inventory.chest)
+  local station = remote.call("bulk-wagons", "get_inventory", s.loader)
   report(count(wagon_b, "coal") == 200, "loading station filled wagon", count(wagon_b, "coal") .. " coal")
   report(count(wagon_b, "copper-ore") > 0, "belt feeds wagon through loading port", count(wagon_b, "copper-ore") .. " copper")
   report(count(wagon_b, "iron-plate") == 0 and count(station, "iron-plate") == 5, "loading station keeps forbidden items")
@@ -203,7 +205,7 @@ local function check()
   local wagon_f = s.wagon_f.get_inventory(defines.inventory.cargo_wagon)
   s.f_count = count(wagon_f, "copper-ore")
   report(s.f_count > 0, "belt loader feeds wagon directly", s.f_count .. " copper")
-  report(s.belt_loader.get_inventory == nil or s.belt_loader.get_inventory(defines.inventory.chest) == nil, "belt loader has no inventory")
+  report(remote.call("bulk-wagons", "get_inventory", s.belt_loader) == nil, "belt loader has no inventory")
 
   if s.wagon_v then
     local wagon_v = s.wagon_v.get_inventory(defines.inventory.cargo_wagon)

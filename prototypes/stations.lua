@@ -1,5 +1,6 @@
 local shared = require("shared")
 local sounds = require("__base__.prototypes.entity.sounds")
+local graphics = require("prototypes.graphics")
 
 local wagon_slots = settings.startup["bulk-wagons-wagon-slots"].value
 local gfx = "__bulk-wagons__/graphics/placeholder/"
@@ -10,6 +11,10 @@ local gfx = "__bulk-wagons__/graphics/placeholder/"
 local station_mask = { layers = { player = true, is_object = true, transport_belt = true } }
 local walkable_mask = { layers = { is_object = true, transport_belt = true } }
 
+-- A station is a visual entity (simple-entity-with-owner: draws on a chosen render
+-- layer, rotates through its variants, shows in ghosts and blueprints). Stations with
+-- an inventory get a hidden container on top, created by the script, which takes
+-- the mouse (higher selection priority), the GUI, inserters and circuit wires.
 local function station_variants(def)
   local prototypes = {}
   for _, planet in pairs(shared.active_planets(mods)) do
@@ -21,8 +26,9 @@ local function station_variants(def)
         half_w, half_h = 1, 3
       end
 
-      local entity = {
-        type = def.inventory and "container" or "simple-entity-with-owner",
+      local picture = graphics.station_picture(def.sprite, variant, planet)
+      prototypes[#prototypes + 1] = {
+        type = "simple-entity-with-owner",
         name = name,
         icon = def.icon,
         flags = { "placeable-neutral", "player-creation" },
@@ -32,25 +38,55 @@ local function station_variants(def)
         max_health = 500,
         corpse = "medium-remnants",
         dying_explosion = "medium-explosion",
-        open_sound = sounds.metallic_chest_open,
-        close_sound = sounds.metallic_chest_close,
         collision_box = { { -half_w + 0.1, -half_h + 0.1 }, { half_w - 0.1, half_h - 0.1 } },
         selection_box = { { -half_w, -half_h }, { half_w, half_h } },
         collision_mask = def.walkable and walkable_mask or station_mask,
-        picture = {
-          filename = gfx .. def.sprite .. "-" .. variant .. ".png",
+        render_layer = def.render_layer,
+        picture = picture or {
+          filename = gfx .. def.placeholder .. "-" .. variant .. ".png",
           width = vertical and 384 or 128,
           height = vertical and 128 or 384,
           scale = 0.5,
           tint = shared.placeholder_tint[planet],
         },
       }
-      if def.inventory then
-        entity.inventory_size = math.max(1, math.floor(wagon_slots * def.inventory + 0.5))
-        entity.inventory_type = "with_filters_and_bar"
-        entity.circuit_wire_max_distance = 9
+    end
+  end
+
+  if def.inventory then
+    for _, vertical in pairs({ true, false }) do
+      local half_w, half_h = 3, 1
+      if not vertical then
+        half_w, half_h = 1, 3
       end
-      prototypes[#prototypes + 1] = entity
+      prototypes[#prototypes + 1] = {
+        type = "container",
+        name = shared.store_name(def.name, vertical),
+        icon = def.icon,
+        flags = {
+          "placeable-neutral",
+          "player-creation",
+          "not-blueprintable",
+          "not-deconstructable",
+          "placeable-off-grid",
+        },
+        hidden = true,
+        localised_name = { "entity-name." .. def.name },
+        localised_description = { "entity-description." .. def.name },
+        placeable_by = { item = def.name, count = 1 },
+        minable = { mining_time = 0.5, result = def.name },
+        selection_priority = 60,
+        max_health = 500,
+        open_sound = sounds.metallic_chest_open,
+        close_sound = sounds.metallic_chest_close,
+        collision_box = { { -half_w + 0.1, -half_h + 0.1 }, { half_w - 0.1, half_h - 0.1 } },
+        selection_box = { { -half_w, -half_h }, { half_w, half_h } },
+        collision_mask = { layers = {} },
+        inventory_size = math.max(1, math.floor(wagon_slots * def.inventory + 0.5)),
+        inventory_type = "with_filters_and_bar",
+        circuit_wire_max_distance = 9,
+        picture = util.empty_sprite(),
+      }
     end
   end
 
@@ -92,7 +128,10 @@ end
 data:extend(station_variants({
   name = shared.pit,
   icon = gfx .. "unloading-pit-icon.png",
-  sprite = "unloading-pit",
+  sprite = "e1",
+  placeholder = "unloading-pit",
+  -- over ballast and sleepers, under the rail metal
+  render_layer = "ground-patch-higher2",
   order = "a[train-system]-z[bulk]-c[unloading-pit]",
   inventory = settings.startup["bulk-wagons-pit-multiplier"].value,
   walkable = true,
@@ -108,7 +147,9 @@ data:extend(station_variants({
 data:extend(station_variants({
   name = shared.belt_loader,
   icon = gfx .. "belt-loader-icon.png",
-  sprite = "belt-loader",
+  sprite = "b3",
+  placeholder = "belt-loader",
+  render_layer = "lower-object-above-shadow",
   order = "a[train-system]-z[bulk]-a[belt-loader]",
   ingredients = {
     { type = "item", name = "steel-plate", amount = 10 },
@@ -121,7 +162,9 @@ data:extend(station_variants({
 data:extend(station_variants({
   name = shared.loader,
   icon = gfx .. "loading-station-icon.png",
-  sprite = "loading-station",
+  sprite = "b1",
+  placeholder = "loading-station",
+  render_layer = "lower-object-above-shadow",
   order = "a[train-system]-z[bulk]-b[loading-station]",
   inventory = settings.startup["bulk-wagons-loader-multiplier"].value,
   ingredients = {
@@ -132,7 +175,10 @@ data:extend(station_variants({
   },
 }))
 
+graphics.station_overlays()
+
 -- Built-in belt ports: hidden 1x1 loaders the script places at the station's port tile.
+-- Only their belt shows; the housing is part of the station artwork.
 local function make_port(name, speed, container_distance, rail_interaction)
   local port = table.deepcopy(data.raw["loader-1x1"]["loader-1x1"])
   port.name = name
@@ -153,6 +199,9 @@ local function make_port(name, speed, container_distance, rail_interaction)
   port.container_distance = container_distance
   port.allow_rail_interaction = rail_interaction
   port.filter_count = 0
+  if graphics.available then
+    port.structure = { direction_in = util.empty_sprite(), direction_out = util.empty_sprite() }
+  end
   return port
 end
 
