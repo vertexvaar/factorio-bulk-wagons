@@ -121,8 +121,125 @@ def shadow_catcher(size=40):
 
 # ---------------------------------------------------------------- materials
 
-def material(name, color, roughness=0.5, metallic=0.0, grime=0.25, scale=6.0, bump=0.15, emission=None):
-    """Principled material with procedural grime and grain, so flat surfaces read as worn metal."""
+def _math(nt, op, a, b=None, c=None, clamp=False):
+    node = nt.nodes.new("ShaderNodeMath")
+    node.operation = op
+    node.use_clamp = clamp
+    for i, v in enumerate((a, b, c)):
+        if v is None:
+            continue
+        if isinstance(v, (int, float)):
+            node.inputs[i].default_value = v
+        else:
+            nt.links.new(v, node.inputs[i])
+    return node.outputs[0]
+
+
+def _noise(nt, vector, scale, detail=8, roughness=0.6, distortion=0.0):
+    node = nt.nodes.new("ShaderNodeTexNoise")
+    node.inputs["Scale"].default_value = scale
+    node.inputs["Detail"].default_value = detail
+    node.inputs["Roughness"].default_value = roughness
+    node.inputs["Distortion"].default_value = distortion
+    nt.links.new(vector, node.inputs["Vector"])
+    return node.outputs["Fac"]
+
+
+def _stretched(nt, coord, scale_xyz):
+    node = nt.nodes.new("ShaderNodeMapping")
+    node.inputs["Scale"].default_value = scale_xyz
+    nt.links.new(coord.outputs["Object"], node.inputs["Vector"])
+    return node.outputs["Vector"]
+
+
+def _wear(nt, coord, rust, scrape):
+    """Procedural wear (no texture licences involved). Returns sockets:
+      depth   - how far inside a rust patch (<0 outside, 0 at its edge)
+      rust    - 0/1 rust patch, hard edged
+      halo    - 0..1 stained, blistered paint just outside a patch
+      stain   - 0..1 rust run-off streaks on the paint
+      scrape  - 0..1 paint worn off down to bare steel by sliding goods
+    Patches cluster: a large noise decides where the surface is badly corroded."""
+    obj = coord.outputs["Object"]
+    out = {}
+    if rust > 0:
+        blot = _noise(nt, obj, 2.6, detail=15, roughness=0.72, distortion=0.9)
+        region = _noise(nt, obj, 0.45, detail=2)
+        bias = _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", region, 0.5), 0.5)
+        depth = _math(nt, "SUBTRACT", _math(nt, "ADD", blot, bias), 0.75 - 0.2 * rust)
+        out["depth"] = depth
+        out["rust"] = _math(nt, "GREATER_THAN", depth, 0.0)
+        # 1 at the edge, fading to 0 three hundredths outside
+        halo = _math(nt, "MULTIPLY_ADD", depth, 22.0, 1.0)
+        out["halo"] = _math(nt, "MULTIPLY", _math(nt, "MINIMUM", halo, 1.0, clamp=True), _math(nt, "LESS_THAN", depth, 0.0))
+        streak = _noise(nt, _stretched(nt, coord, (16, 16, 0.8)), 1.6, detail=6)
+        out["stain"] = _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", streak, 0.62 - 0.1 * rust, clamp=True), 4.0, clamp=True)
+    if scrape:
+        z0, z1, amount = scrape
+        z = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(obj, z.inputs[0])
+        low = _math(nt, "SUBTRACT", 1.0, _math(nt, "DIVIDE", _math(nt, "SUBTRACT", z.outputs["Z"], z0), z1 - z0), clamp=True)
+        lines = _noise(nt, _stretched(nt, coord, (55, 55, 2.0)), 1.0, detail=4)
+        patchy = _noise(nt, obj, 3.0, detail=4)
+        wear = _math(nt, "MULTIPLY", _math(nt, "ADD", lines, _math(nt, "MULTIPLY", patchy, 0.5)), _math(nt, "POWER", low, 0.7))
+        out["scrape"] = _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", wear, 0.62 - 0.35 * amount, clamp=True), 6.0, clamp=True)
+    return out
+
+
+def _paint_left(nt, wear):
+    """Share of the surface still painted (what the train colour tints)."""
+    left = 1.0
+    if "rust" in wear:
+        left = _math(nt, "SUBTRACT", 1.0, wear["rust"])
+        left = _math(nt, "MULTIPLY", left, _math(nt, "SUBTRACT", 1.0, _math(nt, "MULTIPLY", wear["stain"], 0.5)))
+    if "scrape" in wear:
+        left = _math(nt, "MULTIPLY", left, _math(nt, "SUBTRACT", 1.0, wear["scrape"])) if not isinstance(left, float) \
+            else _math(nt, "SUBTRACT", 1.0, wear["scrape"])
+    return left
+
+
+def _wear_mask_material(name, rust, scrape):
+    """Mask pass twin of a worn material: tint only where paint is left."""
+    mat = bpy.data.materials.new(name + "_mask")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.remove(nt.nodes["Principled BSDF"])
+    coord = nt.nodes.new("ShaderNodeTexCoord")
+    left = _paint_left(nt, _wear(nt, coord, rust, scrape))
+    em = nt.nodes.new("ShaderNodeEmission")
+    nt.links.new(left, em.inputs["Color"])
+    nt.links.new(em.outputs[0], nt.nodes["Material Output"].inputs["Surface"])
+    return mat
+
+
+def _mix_color(nt, factor, a, b):
+    node = nt.nodes.new("ShaderNodeMix")
+    node.data_type = "RGBA"
+    if isinstance(factor, (int, float)):
+        node.inputs["Factor"].default_value = factor
+    else:
+        nt.links.new(factor, node.inputs["Factor"])
+    for socket, v in ((node.inputs["A"], a), (node.inputs["B"], b)):
+        if isinstance(v, tuple):
+            socket.default_value = (*v, 1)
+        else:
+            nt.links.new(v, socket)
+    return node.outputs["Result"]
+
+
+def _mix_value(nt, factor, a, b):
+    return _math(nt, "ADD", _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", 1.0, factor), a), _math(nt, "MULTIPLY", factor, b))
+
+
+def material(name, color, roughness=0.5, metallic=0.0, grime=0.25, scale=6.0, bump=0.15, emission=None, rust=0.0,
+             scrape=None):
+    """Principled material with procedural grime and grain, so flat surfaces read as worn metal.
+
+    rust (0..1): how much of the surface is corroded through. Rust patches have a dark
+    rim and get redder towards the middle; worn parts are left out of the tint mask, so
+    they keep their colour whatever colour the train has.
+    scrape (z_low, z_high, amount): paint rubbed off down to bare steel, strongest low
+    down, as on hopper slopes where the goods slide out."""
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
@@ -195,6 +312,47 @@ def material(name, color, roughness=0.5, metallic=0.0, grime=0.25, scale=6.0, bu
     nt.links.new(mix2.outputs["Result"], mix3.inputs["A"])
     nt.links.new(streak_ramp.outputs["Result"], mix3.inputs["B"])
     nt.links.new(mix3.outputs["Result"], bsdf.inputs["Base Color"])
+
+    if rust > 0 or scrape:
+        wear = _wear(nt, coord, rust, scrape)
+        surface = mix3.outputs["Result"]
+        rough = roughness
+        metal = metallic
+        if scrape:
+            # bare steel with fine scratches along the slope
+            scratches = _noise(nt, _stretched(nt, coord, (120, 120, 4)), 1.0, detail=2)
+            steel = _mix_color(nt, scratches, (0.22, 0.22, 0.23), (0.48, 0.48, 0.5))
+            surface = _mix_color(nt, wear["scrape"], surface, steel)
+            rough = _mix_value(nt, wear["scrape"], rough, 0.3)
+            metal = _mix_value(nt, wear["scrape"], metal, 0.9)
+        if rust > 0:
+            surface = _mix_color(nt, _math(nt, "MULTIPLY", wear["stain"], 0.5), surface, (0.16, 0.07, 0.025))
+            surface = _mix_color(nt, _math(nt, "MULTIPLY", wear["halo"], 0.75), surface, (0.04, 0.025, 0.015))
+            ramp = nt.nodes.new("ShaderNodeValToRGB")
+            cr = ramp.color_ramp
+            cr.elements[0].position = 0.0
+            cr.elements[0].color = (0.03, 0.015, 0.01, 1)
+            cr.elements[1].position = 1.0
+            cr.elements[1].color = (0.26, 0.06, 0.02, 1)
+            for pos, col in ((0.15, (0.09, 0.04, 0.015)), (0.45, (0.2, 0.08, 0.025)), (0.75, (0.25, 0.075, 0.022))):
+                e = cr.elements.new(pos)
+                e.color = (*col, 1)
+            tone = _noise(nt, coord.outputs["Object"], 11, detail=10)
+            inner = _math(nt, "ADD", _math(nt, "MULTIPLY", wear["depth"], 7.0), _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", tone, 0.5), 0.5), clamp=True)
+            nt.links.new(inner, ramp.inputs["Fac"])
+            surface = _mix_color(nt, wear["rust"], surface, ramp.outputs["Color"])
+            rough = _mix_value(nt, wear["rust"], rough, 0.95)
+            metal = _mix_value(nt, wear["rust"], metal, 0.0)
+            # flaking: rust sits proud of the paint and is pitted
+            height = _math(nt, "MULTIPLY_ADD", wear["rust"], 0.6, tone)
+            nt.links.new(height, bump_node.inputs["Height"])
+            bump_node.inputs["Strength"].default_value = max(bump, 0.35)
+        nt.links.new(surface, bsdf.inputs["Base Color"])
+        if not isinstance(rough, float):
+            nt.links.new(rough, bsdf.inputs["Roughness"])
+        if not isinstance(metal, float):
+            nt.links.new(metal, bsdf.inputs["Metallic"])
+        mat["mask_mat"] = _wear_mask_material(name, rust, scrape).name
 
     if emission:
         bsdf.inputs["Emission Color"].default_value = (*emission, 1)
@@ -330,7 +488,8 @@ def _set_mask_mode(enabled, white, holdout):
             masked = obj.get("mask")
             for i in range(len(obj.data.materials)):
                 tinted = masked is True or masked == 1 and i == 0
-                obj.data.materials[i] = white if tinted else holdout
+                twin = bpy.data.materials[obj["orig_mats"][i]].get("mask_mat")
+                obj.data.materials[i] = (bpy.data.materials[twin] if twin else white) if tinted else holdout
         elif "orig_mats" in obj:
             for i, name in enumerate(obj["orig_mats"]):
                 obj.data.materials[i] = bpy.data.materials[name]

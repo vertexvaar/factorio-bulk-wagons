@@ -30,15 +30,15 @@ ore = []
 
 def materials():
     return {
-        "steel": rig.material("steel", (0.30, 0.31, 0.32), roughness=0.4, metallic=0.7, grime=0.3),
-        "dark": rig.material("dark", (0.05, 0.05, 0.055), roughness=0.6, metallic=0.4, grime=0.3),
+        "steel": rig.material("steel", (0.30, 0.31, 0.32), roughness=0.4, metallic=0.7, grime=0.3, rust=0.45),
+        "dark": rig.material("dark", (0.05, 0.05, 0.055), roughness=0.6, metallic=0.4, grime=0.3, rust=0.3),
         "concrete": rig.material("concrete", (0.45, 0.43, 0.40), roughness=0.9, grime=0.45, scale=4, bump=0.4),
         "pit": rig.material("pit", (0.16, 0.15, 0.14), roughness=0.95, grime=0.5, scale=4, bump=0.5),
-        "grate": rig.material("grate", (0.38, 0.39, 0.40), roughness=0.35, metallic=0.85, grime=0.25),
-        "yellow": rig.material("yellow", (0.80, 0.58, 0.06), roughness=0.5, grime=0.35),
+        "grate": rig.material("grate", (0.38, 0.39, 0.40), roughness=0.35, metallic=0.85, grime=0.25, rust=0.4),
+        "yellow": rig.material("yellow", (0.80, 0.58, 0.06), roughness=0.5, grime=0.35, rust=0.5),
         "rubber": rig.material("rubber", (0.035, 0.035, 0.035), roughness=0.85, grime=0.2, bump=0.3),
         "roller": rig.material("roller", (0.55, 0.55, 0.55), roughness=0.3, metallic=0.9, grime=0.2),
-        "motor": rig.material("motor", (0.20, 0.28, 0.36), roughness=0.45, metallic=0.3, grime=0.3),
+        "motor": rig.material("motor", (0.20, 0.28, 0.36), roughness=0.45, metallic=0.3, grime=0.3, rust=0.4),
         "brass": rig.material("brass", (0.62, 0.45, 0.16), roughness=0.3, metallic=0.9, grime=0.15),
         "ore": rig.material("ore", (0.32, 0.29, 0.26), roughness=1.0, grime=0.5, scale=14, bump=0.8),
         "beacon": rig.material("beacon", (1.0, 0.6, 0.1), emission=(1.0, 0.55, 0.1)),

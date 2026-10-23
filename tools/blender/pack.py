@@ -15,6 +15,7 @@ from PIL import Image
 
 SUPERSAMPLE = 2
 MASK_STRENGTH = 0.75  # vanilla masks do not tint at full strength either
+MASK_GREY = 160
 
 
 # Buildings sit on the square tile grid, so their renders are stretched vertically
@@ -36,7 +37,9 @@ def load(render_dir, kind, index, stretch=1.0):
     elif kind == "mask":
         a = np.asarray(im).astype(np.float32)
         out = np.zeros_like(a)
-        out[..., 0:3] = 255
+        # Factorio overlays (mask colour x tint) onto the sprite: below 0.5 that is
+        # 2 * mask * tint * sprite. Grey 160 keeps the paint about as bright as rendered.
+        out[..., 0:3] = MASK_GREY
         out[..., 3] = a[..., 3] * (a[..., 0] / 255.0) * MASK_STRENGTH
         im = Image.fromarray(out.astype(np.uint8))
     return im
@@ -48,7 +51,8 @@ def tinted(color, mask, tint):
     m = np.asarray(mask).astype(np.float32)[..., 3:4] / 255
     t = np.array(tint, dtype=np.float32).reshape(1, 1, 3)
     base = c[..., :3]
-    over = np.where(base < 0.5, 2 * base * t, 1 - 2 * (1 - base) * (1 - t))
+    a = MASK_GREY / 255 * t
+    over = np.where(a < 0.5, 2 * a * base, 1 - 2 * (1 - a) * (1 - base))
     rgb = base * (1 - m) + over * m
     out = np.concatenate([rgb, c[..., 3:4]], axis=2)
     return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8))

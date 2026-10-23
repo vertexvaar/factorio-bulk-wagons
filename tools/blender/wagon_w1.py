@@ -18,21 +18,28 @@ LOW_HALF_LEN = 2.0
 HALF_W = 0.98  # hopper half width
 LOW_HALF_W = 0.46
 BODY_TOP = 1.95
-BELT = 1.30  # where the vertical sides end and the slopes start
-Z_LOW = 0.98
+BELT = 1.45  # where the vertical sides end and the hopper funnels start
+Z_LOW = 0.92  # bottom opening of the funnels
 SILL = 0.80  # top of the underframe
 BOGIE_Y = 2.0
 END_Y = 3.2  # headstock
-BAYS = (-1.3, 0.0, 1.3)
+# three equal compartments, each a funnel down to its discharge flaps
+EDGES = (-TOP_HALF_LEN, -TOP_HALF_LEN / 3, TOP_HALF_LEN / 3, TOP_HALF_LEN)
+BAYS = tuple((EDGES[i] + EDGES[i + 1]) / 2 for i in range(3))
+BAY_HALF = TOP_HALF_LEN / 3
 
 
 def materials(planet="nauvis"):
     return {
-        "paint": rig.material("paint", (0.42, 0.43, 0.44), roughness=0.42, grime=0.35, scale=2.5, bump=0.1),
+        "paint": rig.material("paint", (0.42, 0.43, 0.44), roughness=0.42, grime=0.45, scale=2.5, bump=0.1, rust=0.85),
+        "paint_worn": rig.material("paint_worn", (0.2, 0.19, 0.18), roughness=0.75, grime=0.55, scale=4, bump=0.3, rust=0.9),
+        # funnel insides: goods sliding down have rubbed the paint off the lower slopes
+        "paint_slope": rig.material("paint_slope", (0.2, 0.19, 0.18), roughness=0.75, grime=0.55, scale=4, bump=0.3, rust=0.7,
+                                    scrape=(Z_LOW, BELT + 0.1, 0.8)),
         "paint_in": rig.material("paint_in", (0.075, 0.07, 0.065), roughness=0.9, grime=0.5, scale=5, bump=0.3),
-        "steel": rig.material("steel", (0.24, 0.24, 0.25), roughness=0.35, metallic=0.75, grime=0.3),
-        "dark": rig.material("dark", (0.06, 0.06, 0.065), roughness=0.5, metallic=0.5, grime=0.2),
-        "sill": rig.material("sill", (0.42, 0.27, 0.08), roughness=0.55, grime=0.4, scale=4),
+        "steel": rig.material("steel", (0.24, 0.24, 0.25), roughness=0.35, metallic=0.75, grime=0.4, rust=0.35),
+        "dark": rig.material("dark", (0.06, 0.06, 0.065), roughness=0.5, metallic=0.5, grime=0.3, rust=0.3),
+        "sill": rig.material("sill", (0.42, 0.27, 0.08), roughness=0.55, grime=0.5, scale=4, rust=0.5),
         "rust": rig.material("rust", (0.28, 0.14, 0.06), roughness=0.85, grime=0.5, scale=8, bump=0.35),
         "rail": rig.material("rail", (0.72, 0.72, 0.70), roughness=0.3, metallic=0.85, grime=0.25),
         "rivet": rig.material("rivet", (0.30, 0.30, 0.31), roughness=0.3, metallic=0.8, grime=0.1),
@@ -51,93 +58,98 @@ def rivet_row(name, start, end, count, m, radius=0.018, axis="x"):
                      radius, m["rivet"], verts=8)
 
 
-def hopper(m):
-    """Open hopper body: vertical upper band, sloped sides and ends down to three discharge bays."""
-    outer = [
-        (-HALF_W, -TOP_HALF_LEN, BODY_TOP), (HALF_W, -TOP_HALF_LEN, BODY_TOP),
-        (HALF_W, TOP_HALF_LEN, BODY_TOP), (-HALF_W, TOP_HALF_LEN, BODY_TOP),
-        (-HALF_W, -BELT_HALF_LEN, BELT), (HALF_W, -BELT_HALF_LEN, BELT),
-        (HALF_W, BELT_HALF_LEN, BELT), (-HALF_W, BELT_HALF_LEN, BELT),
-        (-LOW_HALF_W, -LOW_HALF_LEN, Z_LOW), (LOW_HALF_W, -LOW_HALF_LEN, Z_LOW),
-        (LOW_HALF_W, LOW_HALF_LEN, Z_LOW), (-LOW_HALF_W, LOW_HALF_LEN, Z_LOW),
-    ]
-    faces = [
-        (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0),
-        (4, 8, 9, 5), (5, 9, 10, 6), (6, 10, 11, 7), (7, 11, 8, 4),
-        (8, 11, 10, 9),
-    ]
-    shell = rig.mesh("hopper", outer, faces, [m["paint"], m["paint_in"]], mask=1)
-    solid = shell.modifiers.new("solid", "SOLIDIFY")
-    solid.thickness = 0.04
-    solid.offset = -1
-    solid.material_offset = 1
-    solid.use_rim = True
-    bevel = shell.modifiers.new("bevel", "BEVEL")
-    bevel.width = 0.015
+def solid(obj, thickness=0.04, inner_offset=0):
+    mod = obj.modifiers.new("solid", "SOLIDIFY")
+    mod.thickness = thickness
+    mod.offset = -1
+    mod.material_offset = inner_offset
+    mod.use_rim = True
+    bevel = obj.modifiers.new("bevel", "BEVEL")
+    bevel.width = 0.012
     bevel.segments = 2
     bevel.limit_method = "ANGLE"
+    return obj
+
+
+def hopper(m):
+    """Open hopper: a vertical upper band, under it three funnels (one per compartment)
+    narrowing down to discharge flaps. Painted inside and out, so the colour shows inside."""
+    band = [
+        (-HALF_W, -TOP_HALF_LEN, BODY_TOP), (HALF_W, -TOP_HALF_LEN, BODY_TOP),
+        (HALF_W, TOP_HALF_LEN, BODY_TOP), (-HALF_W, TOP_HALF_LEN, BODY_TOP),
+        (-HALF_W, -TOP_HALF_LEN, BELT), (HALF_W, -TOP_HALF_LEN, BELT),
+        (HALF_W, TOP_HALF_LEN, BELT), (-HALF_W, TOP_HALF_LEN, BELT),
+    ]
+    # the inside uses a darker, worn coat of the same paint, so the colour shows without glaring
+    solid(rig.mesh("band", band, [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], [m["paint"], m["paint_worn"]], mask=True),
+          inner_offset=1)
+
+    ox, oy = 0.2, 0.22  # half size of the bottom opening
+    for k, y in enumerate(BAYS):
+        y0, y1 = EDGES[k], EDGES[k + 1]
+        funnel = rig.mesh(f"funnel{k}", [
+            (-HALF_W, y0, BELT), (HALF_W, y0, BELT), (HALF_W, y1, BELT), (-HALF_W, y1, BELT),
+            (-ox, y - oy, Z_LOW), (ox, y - oy, Z_LOW), (ox, y + oy, Z_LOW), (-ox, y + oy, Z_LOW),
+        ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], [m["paint"], m["paint_slope"]], mask=True)
+        solid(funnel, inner_offset=1)
+        # discharge flaps closing the opening, hinged on the long edges
+        for sx in (-1, 1):
+            flap = rig.mesh(f"flap{k}{sx}", [
+                (sx * (ox + 0.02), y - oy - 0.02, Z_LOW - 0.01), (sx * (ox + 0.02), y + oy + 0.02, Z_LOW - 0.01),
+                (0, y + oy + 0.02, Z_LOW - 0.08), (0, y - oy - 0.02, Z_LOW - 0.08),
+            ], [(0, 1, 2, 3)], m["rust"])
+            solid(flap, 0.025)
+            rig.cylinder(f"hinge{k}{sx}", (sx * (ox + 0.02), y - oy - 0.04, Z_LOW - 0.01),
+                         (sx * (ox + 0.02), y + oy + 0.04, Z_LOW - 0.01), 0.022, m["dark"], verts=10)
+            # flap lever outside the funnel
+            rig.box(f"flap_lever{k}{sx}", (sx * (ox + 0.12), y, Z_LOW - 0.08), (0.2, 0.05, 0.04), m["dark"], bevel=0.005)
+        rig.box(f"flap_seam{k}", (0, y, Z_LOW - 0.075), (0.03, 2 * oy + 0.04, 0.02), m["dark"], bevel=0)
+        # ridge cap where two funnels meet, and ribs down the outside of the slopes
+        if k > 0:
+            rig.box(f"ridge{k}", (0, y0, BELT + 0.02), (2 * HALF_W, 0.06, 0.05), m["paint"], mask=True)
+        for sx in (-1, 1):
+            for t in (-0.5, 0.5):
+                top = (sx * (HALF_W + 0.01), y + t * BAY_HALF, BELT)
+                low = (sx * (ox + 0.04), y + t * oy, Z_LOW + 0.02)
+                rig.cylinder(f"rib{k}{sx}{t}", top, low, 0.022, m["paint"], verts=6, mask=True)
+        # cross bracing inside the top of each compartment, like the original
+        rig.cylinder(f"tie{k}", (-HALF_W, y, BODY_TOP - 0.2), (HALF_W, y, BODY_TOP - 0.2), 0.022, m["steel"], verts=8)
 
     # heavy rolled top rim with rivets
     for sx in (-1, 1):
         rig.box(f"rim_side{sx}", (sx * (HALF_W + 0.02), 0, BODY_TOP - 0.03), (0.08, 2 * TOP_HALF_LEN + 0.08, 0.1), m["paint"], mask=True)
         rivet_row(f"rim_rivets{sx}", (sx * (HALF_W + 0.065), -TOP_HALF_LEN + 0.1, BODY_TOP - 0.03),
-                  (sx * (HALF_W + 0.065), TOP_HALF_LEN - 0.1, BODY_TOP - 0.03), 22, m)
+                  (sx * (HALF_W + 0.065), TOP_HALF_LEN - 0.1, BODY_TOP - 0.03), 26, m)
     for sy in (-1, 1):
         rig.box(f"rim_end{sy}", (0, sy * (TOP_HALF_LEN + 0.02), BODY_TOP - 0.03), (2 * HALF_W + 0.12, 0.08, 0.1), m["paint"], mask=True)
 
-    # side stiffeners (U-channels) and two horizontal ribs on the upper band
+    # stiffeners (U-channels), a mid rib and the lower ledge on the band
     for sx in (-1, 1):
-        for i in range(9):
-            y = -2.2 + i * (4.4 / 8)
-            rig.box(f"stiff{sx}_{i}", (sx * (HALF_W + 0.035), y, (BELT + BODY_TOP) / 2 - 0.04),
-                    (0.07, 0.09, BODY_TOP - BELT - 0.06), m["paint"], mask=True)
-        for z in (BELT + 0.22, BELT + 0.44):
-            rig.box(f"rib{sx}{z}", (sx * (HALF_W + 0.012), 0, z), (0.025, 2 * BELT_HALF_LEN - 0.1, 0.035), m["paint"], mask=True)
-        rig.box(f"ledge{sx}", (sx * (HALF_W + 0.04), 0, BELT + 0.02), (0.09, 2 * BELT_HALF_LEN, 0.06), m["paint"], mask=True)
-        # braces down the sloped side panels
-        for i in range(7):
-            y = -1.8 + i * 0.6
-            x_top, x_low = sx * (HALF_W + 0.01), sx * (LOW_HALF_W + 0.01)
-            rig.cylinder(f"brace{sx}_{i}", (x_top, y, BELT), (x_low, y * 0.92, Z_LOW + 0.02), 0.03, m["paint"], verts=6)
+        for i in range(10):
+            y = -TOP_HALF_LEN + 0.25 + i * (2 * TOP_HALF_LEN - 0.5) / 9
+            rig.box(f"stiff{sx}_{i}", (sx * (HALF_W + 0.035), y, (BELT + BODY_TOP) / 2 - 0.03),
+                    (0.07, 0.09, BODY_TOP - BELT - 0.04), m["paint"], mask=True)
+        rig.box(f"midrib{sx}", (sx * (HALF_W + 0.012), 0, (BELT + BODY_TOP) / 2), (0.025, 2 * TOP_HALF_LEN - 0.1, 0.035), m["paint"], mask=True)
+        rig.box(f"ledge{sx}", (sx * (HALF_W + 0.04), 0, BELT + 0.01), (0.09, 2 * TOP_HALF_LEN, 0.06), m["paint"], mask=True)
+        rivet_row(f"ledge_rivets{sx}", (sx * (HALF_W + 0.09), -TOP_HALF_LEN + 0.1, BELT + 0.01),
+                  (sx * (HALF_W + 0.09), TOP_HALF_LEN - 0.1, BELT + 0.01), 26, m, radius=0.014)
 
     # end frames with round lightening holes, like the original's end posts
     for sy in (-1, 1):
+        y = sy * (TOP_HALF_LEN + 0.1)
         for sx in (-1, 1):
-            y = sy * (BELT_HALF_LEN + 0.12)
-            rig.box(f"end_post{sy}{sx}", (sx * 0.62, y, (SILL + BODY_TOP) / 2 - 0.1), (0.1, 0.12, BODY_TOP - SILL - 0.2), m["paint"], mask=True)
+            rig.box(f"end_post{sy}{sx}", (sx * 0.62, y, (SILL + BODY_TOP) / 2 - 0.05), (0.1, 0.12, BODY_TOP - SILL - 0.1), m["paint"], mask=True)
             rig.torus(f"end_hole{sy}{sx}", (sx * 0.62, y + sy * 0.065, 1.2), 0.07, 0.015, m["dark"], rotation=(math.pi / 2, 0, 0))
-        rig.box(f"end_cross{sy}", (0, sy * (BELT_HALF_LEN + 0.12), 1.55), (1.3, 0.1, 0.1), m["paint"], mask=True)
+        rig.box(f"end_cross{sy}", (0, y, 1.62), (1.3, 0.1, 0.1), m["paint"], mask=True)
 
-    # inner stiffeners and leftover ore dust on the slopes
+    # railing along the top edges
     for sx in (-1, 1):
-        for i in range(5):
-            y = -2.0 + i * 1.0
-            rig.box(f"inner_stiff{sx}_{i}", (sx * (HALF_W - 0.06), y, (BELT + BODY_TOP) / 2), (0.05, 0.06, BODY_TOP - BELT - 0.1), m["steel"])
-    for y in BAYS:
-        dust = rig.mesh(f"dust{y}", [
-            (-0.7, y - 0.45, Z_LOW + 0.2), (0.7, y - 0.45, Z_LOW + 0.2), (0.7, y + 0.45, Z_LOW + 0.2), (-0.7, y + 0.45, Z_LOW + 0.2),
-            (0, y, Z_LOW + 0.08),
-        ], [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)], m["dust"])
-
-    # transverse dividers inside, giving three compartments with V-shaped floors
-    for y in (-0.65, 0.65):
-        rig.mesh(f"divider{y}", [
-            (-HALF_W + 0.05, y - 0.38, Z_LOW + 0.05), (HALF_W - 0.05, y - 0.38, Z_LOW + 0.05),
-            (HALF_W - 0.05, y, BODY_TOP - 0.15), (-HALF_W + 0.05, y, BODY_TOP - 0.15),
-            (-HALF_W + 0.05, y + 0.38, Z_LOW + 0.05), (HALF_W - 0.05, y + 0.38, Z_LOW + 0.05),
-        ], [(0, 1, 2, 3), (3, 2, 5, 4)], m["paint_in"])
-        rig.box(f"divider_cap{y}", (0, y, BODY_TOP - 0.14), (2 * HALF_W - 0.08, 0.07, 0.05), m["steel"])
-
-    # three discharge chutes with rusty curved gates underneath
-    for y in BAYS:
-        rig.mesh(f"chute{y}", [
-            (-0.44, y - 0.4, Z_LOW + 0.02), (0.44, y - 0.4, Z_LOW + 0.02), (0.44, y + 0.4, Z_LOW + 0.02), (-0.44, y + 0.4, Z_LOW + 0.02),
-            (-0.24, y - 0.28, 0.64), (0.24, y - 0.28, 0.64), (0.24, y + 0.28, 0.64), (-0.24, y + 0.28, 0.64),
-        ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], m["paint"], bevel=0.01, mask=True)
-        for sx in (-1, 1):
-            gate = rig.cylinder(f"gate{y}{sx}", (sx * 0.32, y - 0.32, 0.6), (sx * 0.32, y + 0.32, 0.6), 0.17, m["rust"], verts=24)
-            gate.scale = (0.55, 1, 1)
-            rig.box(f"gate_arm{y}{sx}", (sx * 0.56, y, 0.72), (0.05, 0.12, 0.24), m["dark"])
+        x = sx * (HALF_W + 0.02)
+        for i in range(8):
+            y = -TOP_HALF_LEN + 0.15 + i * (2 * TOP_HALF_LEN - 0.3) / 7
+            rig.cylinder(f"top_post{sx}{i}", (x, y, BODY_TOP + 0.02), (x, y, BODY_TOP + 0.32), 0.014, m["rail"], verts=8)
+        rig.cylinder(f"top_rail{sx}", (x, -TOP_HALF_LEN + 0.15, BODY_TOP + 0.32), (x, TOP_HALF_LEN - 0.15, BODY_TOP + 0.32), 0.018, m["rail"])
+        rig.cylinder(f"top_midrail{sx}", (x, -TOP_HALF_LEN + 0.15, BODY_TOP + 0.18), (x, TOP_HALF_LEN - 0.15, BODY_TOP + 0.18), 0.012, m["rail"])
 
 
 def underframe(m):
@@ -152,8 +164,8 @@ def underframe(m):
         # gate operating shaft with lever brackets and bearing blocks
         rig.cylinder(f"shaft{sx}", (sx * 0.96, -2.4, 1.04), (sx * 0.96, 2.4, 1.04), 0.028, m["steel"])
         for y in BAYS:
-            rig.box(f"lever{sx}{y}", (sx * 0.96, y + 0.2, 1.04), (0.08, 0.08, 0.16), m["steel"], bevel=0.01)
-            rig.box(f"lever_arm{sx}{y}", (sx * 0.96, y + 0.2, 0.9), (0.035, 0.035, 0.24), m["steel"], bevel=0)
+            rig.box(f"lever{sx}{y}", (sx * 0.96, y + 0.3, 1.04), (0.08, 0.08, 0.16), m["steel"], bevel=0.01)
+            rig.box(f"lever_arm{sx}{y}", (sx * 0.96, y + 0.3, 0.9), (0.035, 0.035, 0.24), m["steel"], bevel=0)
             rig.box(f"bearing{sx}{y}", (sx * 0.93, y - 0.35, 1.04), (0.06, 0.08, 0.1), m["dark"])
     for sy in (-1, 1):
         rig.box(f"bolster{sy}", (0, sy * BOGIE_Y, SILL - 0.12), (1.85, 0.3, 0.16), m["dark"])
@@ -183,16 +195,17 @@ def ends(m):
         rig.cylinder(f"railing_cross{sy}", (-0.92, sy * (END_Y - 0.06), SILL + 0.62), (0.92, sy * (END_Y - 0.06), SILL + 0.62), 0.02, m["rail"])
         rig.box(f"coupler{sy}", (0, sy * (END_Y + 0.12), SILL - 0.18), (0.18, 0.26, 0.12), m["dark"])
         rig.box(f"coupler_knuckle{sy}", (0, sy * (END_Y + 0.26), SILL - 0.18), (0.26, 0.08, 0.14), m["steel"])
-    # ladder up the front end
-    for sx in (-0.2, 0.2):
-        rig.cylinder(f"ladder{sx}", (sx, 2.9, SILL), (sx, 2.78, BODY_TOP + 0.15), 0.017, m["rail"])
-    for k in range(7):
-        t = (k + 1) / 8
-        z = SILL + t * (BODY_TOP + 0.15 - SILL)
-        y = 2.9 - t * 0.12
-        rig.cylinder(f"rung{k}", (-0.2, y, z), (0.2, y, z), 0.013, m["rail"])
-    rig.torus("brake_wheel", (0.5, -2.9, SILL + 0.4), 0.12, 0.016, m["dark"], rotation=(math.pi / 2, 0, 0))
-    rig.cylinder("brake_spindle", (0.5, -2.78, SILL), (0.5, -2.9, SILL + 0.4), 0.015, m["dark"])
+    # ladders from both end platforms up to the top railing
+    for sy in (-1, 1):
+        for sx in (-0.2, 0.2):
+            rig.cylinder(f"ladder{sy}{sx}", (sx, sy * 2.95, SILL), (sx, sy * (TOP_HALF_LEN + 0.12), BODY_TOP + 0.35), 0.017, m["rail"])
+        for k in range(8):
+            t = (k + 1) / 9
+            z = SILL + t * (BODY_TOP + 0.35 - SILL)
+            y = sy * (2.95 - t * (2.95 - TOP_HALF_LEN - 0.12))
+            rig.cylinder(f"rung{sy}{k}", (-0.2, y, z), (0.2, y, z), 0.013, m["rail"])
+    rig.torus("brake_wheel", (0.55, -2.9, SILL + 0.4), 0.12, 0.016, m["dark"], rotation=(math.pi / 2, 0, 0))
+    rig.cylinder("brake_spindle", (0.55, -2.9, SILL), (0.55, -2.9, SILL + 0.4), 0.015, m["dark"])
 
 
 def cargo(m):
@@ -204,7 +217,7 @@ def cargo(m):
     lumps = bpy.data.textures.new("lumps", "CLOUDS")
     lumps.noise_scale = 0.35
     n = 28
-    hx, hy = HALF_W - 0.05, 0.6
+    hx, hy = HALF_W - 0.05, BAY_HALF - 0.08
     for y0 in BAYS:
         verts, faces = [], []
         for j in range(n + 1):

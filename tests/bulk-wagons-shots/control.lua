@@ -26,6 +26,7 @@ local function train(surface, vertical, fixed, at, wagons, color)
       w = surface.find_entities_filtered({ type = "cargo-wagon", position = pos(at + (vertical and 7 or -7) * i), radius = 3 })[1]
     end
     w.color = color
+    log("BULKSHOT wagon color " .. serpent.line(w.color))
     list[#list + 1] = w
   end
   loco.train.manual_mode = true
