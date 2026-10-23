@@ -3,7 +3,7 @@ local shared = require("shared")
 local TRANSFER_PERIOD = 30 -- ticks between transfer passes
 local SWEEP_PERIOD = 60 -- ticks between checks for forbidden items in wagons
 local OPEN_GUI_PERIOD = 10 -- ticks between checks of wagons a player has open
-local PORT = "bulk-station" .. shared.port_suffix
+local PORT_NAMES = { [shared.port] = true, [shared.rail_port] = true }
 
 -- Items that are bulk goods but not (or not always) a mined resource.
 local EXTRA_BULK_ITEMS = {
@@ -13,7 +13,7 @@ local EXTRA_BULK_ITEMS = {
 
 -- entity/item name -> { base = station base name, variant = 1..4 }
 local variant_of = {}
-for _, base in pairs({ shared.pit, shared.loader }) do
+for _, base in pairs({ shared.pit, shared.loader, shared.belt_loader }) do
   for variant = 1, shared.variant_count do
     variant_of[shared.variant_name(base, variant)] = { base = base, variant = variant }
   end
@@ -114,8 +114,9 @@ local function create_port(entity, info)
   local outward = PORT_DIRECTIONS[info.variant]
   local is_pit = info.base == shared.pit
   -- A 1x1 loader faces the way items flow: outward when unloading, inward when loading.
+  -- The belt loader's port has no inventory behind it and loads the wagon itself.
   local port = entity.surface.create_entity({
-    name = PORT,
+    name = info.base == shared.belt_loader and shared.rail_port or shared.port,
     position = port_position(entity, info.variant),
     direction = is_pit and outward or OPPOSITE[outward],
     type = is_pit and "output" or "input",
@@ -229,7 +230,7 @@ local function transfer_pass()
   for unit_number, record in pairs(storage.stations) do
     if not record.entity.valid then
       remove_station(unit_number)
-    else
+    elseif record.base ~= shared.belt_loader then
       local wagon = find_wagon(record)
       if wagon then
         local station_inventory = record.entity.get_inventory(defines.inventory.chest)
@@ -250,7 +251,7 @@ end
 local function on_built(event)
   local entity = event.entity or event.destination
   if not (entity and entity.valid) then return end
-  if entity.name == PORT then
+  if PORT_NAMES[entity.name] then
     -- Ports are owned by their station; a cloned port is replaced when the station is registered.
     if event.destination then entity.destroy() end
     return

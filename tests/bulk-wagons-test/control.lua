@@ -59,13 +59,13 @@ local function setup()
   local surface = game.surfaces.nauvis
   surface.request_to_generate_chunks({ 0, 0 }, 3)
   surface.force_generate_chunk_requests()
-  local area = { { -48, -48 }, { 48, 48 } }
+  local area = { { -64, -64 }, { 64, 64 } }
   for _, e in pairs(surface.find_entities_filtered({ area = area })) do
     if e.type ~= "character" then e.destroy() end
   end
   local tiles = {}
-  for x = -48, 47 do
-    for y = -48, 47 do tiles[#tiles + 1] = { name = "lab-dark-1", position = { x, y } } end
+  for x = -64, 63 do
+    for y = -64, 63 do tiles[#tiles + 1] = { name = "lab-dark-1", position = { x, y } } end
   end
   surface.set_tiles(tiles)
 
@@ -101,6 +101,12 @@ local function setup()
   s.wagon_d.get_inventory(defines.inventory.cargo_wagon).insert({ name = "copper-ore", count = 100 })
   s.wagon_d.train.speed = 0.05
 
+  -- Scene F: vertical track x=41, belt loader without inventory, belt feeding in from the east.
+  rail_line(surface, true, 41, -41, 41)
+  s.wagon_f = train(surface, true, 41, -20, -13)
+  s.belt_loader = surface.create_entity({ name = "bulk-belt-loader", position = { 41, -13 }, force = "player", raise_built = true })
+  s.f_belts = belt_run(surface, { 50.5, -13.5 }, { -1, 0 }, 7, defines.direction.west)
+
   -- Scene E: a station dropped crosswise and off-centre next to the horizontal track
   -- turns and centres itself, as it does when a player builds it.
   local skewed = surface.create_entity({ name = "bulk-loading-station", position = { 7, 30 }, force = "player" })
@@ -121,8 +127,12 @@ end
 
 local function feed()
   local s = storage.scene
-  local line = s.in_belts[1].get_transport_line(1)
-  if line.can_insert_at_back() then line.insert_at_back({ name = "copper-ore", count = 1 }) end
+  for _, belts in pairs({ s.in_belts, s.f_belts }) do
+    for i = 1, 2 do
+      local line = belts[1].get_transport_line(i)
+      if line.can_insert_at_back() then line.insert_at_back({ name = "copper-ore", count = 1 }) end
+    end
+  end
 end
 
 local function describe()
@@ -154,6 +164,11 @@ local function check()
   report(count(wagon_b, "coal") == 200, "loading station filled wagon", count(wagon_b, "coal") .. " coal")
   report(count(wagon_b, "copper-ore") > 0, "belt feeds wagon through loading port", count(wagon_b, "copper-ore") .. " copper")
   report(count(wagon_b, "iron-plate") == 0 and count(station, "iron-plate") == 5, "loading station keeps forbidden items")
+
+  local wagon_f = s.wagon_f.get_inventory(defines.inventory.cargo_wagon)
+  s.f_count = count(wagon_f, "copper-ore")
+  report(s.f_count > 0, "belt loader feeds wagon directly", s.f_count .. " copper")
+  report(s.belt_loader.get_inventory == nil or s.belt_loader.get_inventory(defines.inventory.chest) == nil, "belt loader has no inventory")
 
   local wagon_c = s.wagon_c.get_inventory(defines.inventory.cargo_wagon)
   report(count(wagon_c, "stone") == 0, "horizontal pit unloads", count(wagon_c, "stone") .. " left")

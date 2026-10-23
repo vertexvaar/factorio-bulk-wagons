@@ -4,7 +4,9 @@ local shared = {}
 shared.wagon = "bulk-wagon"
 shared.pit = "bulk-unloading-pit"
 shared.loader = "bulk-loading-station"
-shared.port_suffix = "-port"
+shared.belt_loader = "bulk-belt-loader"
+shared.port = "bulk-station-port"
+shared.rail_port = "bulk-rail-port"
 
 -- Each station comes in 4 variants, one per direction of its belt port:
 -- 1 = rail north-south, port east; 2 = rail east-west, port south;

@@ -81,11 +81,14 @@ def main():
     belt = (214, 165, 28, 255)
     pit = station((139, 135, 126, 255), (29, 27, 24, 255), belt, None)
     loader = station((122, 90, 44, 255), (154, 138, 106, 255), belt, (77, 83, 89, 255))
+    belt_loader = station((180, 74, 42, 255), (110, 90, 58, 255), belt, (61, 61, 61, 255))
     for v in range(4):
         pit.rotated(v).save(f"unloading-pit-{v + 1}.png")
         loader.rotated(v).save(f"loading-station-{v + 1}.png")
+        belt_loader.rotated(v).save(f"belt-loader-{v + 1}.png")
     icon((139, 135, 126, 255), (29, 27, 24, 255), belt).save("unloading-pit-icon.png")
     icon((122, 90, 44, 255), (154, 138, 106, 255), belt).save("loading-station-icon.png")
+    icon((180, 74, 42, 255), (110, 90, 58, 255), belt).save("belt-loader-icon.png")
 
 
 if __name__ == "__main__":
