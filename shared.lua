@@ -47,6 +47,16 @@ shared.placeholder_tint = {
 -- Hidden inventory container of a station, one per rail direction.
 function shared.store_name(base, vertical) return base .. (vertical and "-store-v" or "-store-h") end
 
+-- The belt loader has no inventory; a small control box at its tower end carries the
+-- circuit connection and settings window (one per variant, its selection box covers
+-- the whole station). It sits away from the belt port so the port reaches the wagon.
+function shared.control_name(variant) return shared.belt_loader .. "-control-" .. variant end
+
+shared.control_offset = { -2.5, 0.5 } -- variant 1, rotated like the port
+
+-- Hidden constant combinator that puts a station's wagon readings on its network.
+shared.signals = "bulk-station-signals"
+
 function shared.wagon_name(planet) return with_planet(shared.wagon, planet) end
 
 -- Rotates a vector clockwise by (variant - 1) quarter turns.

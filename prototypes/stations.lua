@@ -175,6 +175,60 @@ data:extend(station_variants({
   },
 }))
 
+-- Control boxes of the belt loader (see shared.control_name).
+for variant = 1, shared.variant_count do
+  local vertical = shared.rail_is_vertical(variant)
+  local off = shared.rotate(shared.control_offset, variant)
+  local half_w, half_h = 3, 1
+  if not vertical then
+    half_w, half_h = 1, 3
+  end
+  data:extend({
+    {
+      type = "container",
+      name = shared.control_name(variant),
+      icon = "__bulk-wagons__/graphics/icons/belt-loader.png",
+      flags = {
+        "placeable-neutral",
+        "player-creation",
+        "not-blueprintable",
+        "not-deconstructable",
+        "placeable-off-grid",
+      },
+      hidden = true,
+      localised_name = { "entity-name." .. shared.belt_loader },
+      localised_description = { "entity-description." .. shared.belt_loader },
+      placeable_by = { item = shared.belt_loader, count = 1 },
+      minable = { mining_time = 0.5, result = shared.belt_loader },
+      selection_priority = 60,
+      max_health = 500,
+      collision_box = { { -0.4, -0.4 }, { 0.4, 0.4 } },
+      selection_box = { { -half_w - off[1], -half_h - off[2] }, { half_w - off[1], half_h - off[2] } },
+      collision_mask = { layers = {} },
+      inventory_size = 1,
+      inventory_type = "with_filters_and_bar",
+      circuit_wire_max_distance = 9,
+      picture = util.empty_sprite(),
+    },
+  })
+end
+
+-- Hidden constant combinator wired to a station's inventory: carries the wagon readings.
+local signals = table.deepcopy(data.raw["constant-combinator"]["constant-combinator"])
+signals.name = shared.signals
+signals.hidden = true
+signals.flags =
+  { "not-blueprintable", "not-deconstructable", "not-on-map", "placeable-off-grid", "no-copy-paste", "not-upgradable" }
+signals.selectable_in_game = false
+signals.minable = nil
+signals.collision_mask = { layers = {} }
+signals.collision_box = { { -0.1, -0.1 }, { 0.1, 0.1 } }
+signals.sprites = util.empty_sprite()
+signals.activity_led_sprites = util.empty_sprite()
+signals.draw_circuit_wires = false
+signals.circuit_wire_max_distance = 9
+data:extend({ signals })
+
 graphics.station_overlays()
 
 -- Built-in belt ports: hidden 1x1 loaders the script places at the station's port tile.

@@ -1,4 +1,5 @@
 local shared = require("shared")
+local circuit = require("circuit")
 
 local TRANSFER_PERIOD = 30 -- ticks between transfer passes
 local SWEEP_PERIOD = 60 -- ticks between checks for forbidden items in wagons
@@ -8,6 +9,9 @@ local STORE_NAMES = {}
 for _, base in pairs({ shared.pit, shared.loader }) do
   STORE_NAMES[shared.store_name(base, true)] = true
   STORE_NAMES[shared.store_name(base, false)] = true
+end
+for variant = 1, shared.variant_count do
+  STORE_NAMES[shared.control_name(variant)] = true
 end
 
 -- Items that are bulk goods but not (or not always) a mined resource.
@@ -59,6 +63,7 @@ local function init_storage()
   storage.open_wagons = storage.open_wagons or {} -- player_index -> wagon entity
   storage.remote_allowed = storage.remote_allowed or {}
   storage.store_owner = storage.store_owner or {} -- store unit_number -> station unit_number
+  storage.pending_wires = storage.pending_wires or {} -- position key -> wires waiting for an entity
   storage.cargo = storage.cargo or {} -- wagon unit_number -> { wagon, render, frame, item }
   -- the data stage reports which generated graphics exist
   local info = prototypes.mod_data["bulk-wagons-graphics"]
@@ -175,28 +180,35 @@ local function create_port(entity, info)
   return port
 end
 
-local HAS_STORE = { [shared.pit] = true, [shared.loader] = true }
+local HAS_STORE = { [shared.pit] = true, [shared.loader] = true, [shared.belt_loader] = true }
 local SPRITE_KEY = { [shared.pit] = "e1", [shared.belt_loader] = "b3", [shared.loader] = "b1" }
 local OVERLAY_LAYER = { e1 = "rail-chain-signal-metal", b3 = "higher-object-under", b1 = "higher-object-under" }
 local ANIMATION_SPEED = 0.25
 local EXTEND_TICKS = 32 -- 8 frames at a quarter frame per tick
 
-local function find_store(entity, base)
-  local name = shared.store_name(base, shared.rail_is_vertical(variant_of[entity.name].variant))
-  return entity.surface.find_entities_filtered({ name = name, position = entity.position, limit = 1 })[1]
+-- Name and position of a station's hidden inventory (the belt loader's is a small
+-- control box without usable slots, see shared.control_name).
+local function store_spec(entity, info)
+  if info.base == shared.belt_loader then
+    local off = shared.rotate(shared.control_offset, info.variant)
+    return shared.control_name(info.variant), { entity.position.x + off[1], entity.position.y + off[2] }
+  end
+  return shared.store_name(info.base, shared.rail_is_vertical(info.variant)), entity.position
 end
 
 local function create_store(entity, info)
-  local store = find_store(entity, info.base)
+  local name, position = store_spec(entity, info)
+  local store = entity.surface.find_entities_filtered({ name = name, position = position, radius = 0.1, limit = 1 })[1]
     or entity.surface.create_entity({
-      name = shared.store_name(info.base, shared.rail_is_vertical(info.variant)),
-      position = entity.position,
+      name = name,
+      position = position,
       force = entity.force,
       create_build_effect_smoke = false,
     })
   if store then
     store.destructible = false
     storage.store_owner[store.unit_number] = entity.unit_number
+    if info.base == shared.belt_loader then store.get_inventory(defines.inventory.chest).set_bar(1) end
   end
   return store
 end
@@ -254,7 +266,10 @@ local function register_station(entity, info)
   record.port = create_port(entity, info)
   storage.stations[entity.unit_number] = record
   script.register_on_object_destroyed(entity)
+  circuit.attach(record)
+  if record.store then circuit.on_any_built(record.store) end
   set_state(record, "idle")
+  return record
 end
 
 -- Removes a station and its helpers. With a buffer (mined), the contents of its
@@ -265,6 +280,7 @@ local function remove_station(unit_number, buffer, removing)
   if not record then return end
   storage.stations[unit_number] = nil
   if record.overlay and record.overlay.valid then record.overlay.destroy() end
+  circuit.detach(record)
   local store = record.store
   if store and store.valid and store ~= removing then
     storage.store_owner[store.unit_number] = nil
@@ -412,9 +428,15 @@ local function transfer_pass()
     else
       local wagon = find_wagon(record)
       local store = record.store and record.store.valid and record.store.get_inventory(defines.inventory.chest)
+      local enabled = circuit.enabled(record)
+      circuit.update(record, wagon)
       local working = false
       if record.base == shared.belt_loader then
-        working = wagon ~= nil and port_busy(record)
+        -- the port loads the wagon on its own; a disabled station stops its port
+        if record.port and record.port.valid then record.port.disabled_by_script = not enabled end
+        working = enabled and wagon ~= nil and port_busy(record)
+      elseif not enabled then
+        working = false
       elseif store then
         if wagon then
           local wagon_inventory = wagon.get_inventory(defines.inventory.cargo_wagon)
@@ -450,7 +472,8 @@ end
 local function on_built(event)
   local entity = event.entity or event.destination
   if not (entity and entity.valid) then return end
-  if PORT_NAMES[entity.name] or STORE_NAMES[entity.name] then
+  circuit.on_any_built(entity)
+  if PORT_NAMES[entity.name] or STORE_NAMES[entity.name] or entity.name == shared.signals then
     -- Owned by their station; a cloned one is replaced when the station is registered.
     if event.destination then entity.destroy() end
     return
@@ -468,7 +491,8 @@ local function on_built(event)
     if not (entity and entity.valid) then return end
     info = variant_of[entity.name]
   end
-  register_station(entity, info)
+  local record = register_station(entity, info)
+  if record and event.tags then circuit.from_tags(record, event.tags) end
 end
 
 local function on_removed(event)
@@ -544,12 +568,20 @@ end
 
 local function on_gui_opened(event)
   local entity = event.entity
-  if entity and entity.valid and is_wagon(entity) then storage.open_wagons[event.player_index] = entity end
+  if entity and entity.valid and is_wagon(entity) then
+    storage.open_wagons[event.player_index] = entity
+  elseif entity and entity.valid and STORE_NAMES[entity.name] then
+    local record = storage.stations[storage.store_owner[entity.unit_number] or 0]
+    if record then circuit.open_panel(game.get_player(event.player_index), record) end
+  end
 end
 
 local function on_gui_closed(event)
   local entity = event.entity
   storage.open_wagons[event.player_index] = nil
+  if entity and entity.valid and STORE_NAMES[entity.name] then
+    circuit.close_panel(game.get_player(event.player_index))
+  end
   if entity and entity.valid and is_wagon(entity) then purge_wagon(entity, game.get_player(event.player_index)) end
 end
 
@@ -596,9 +628,7 @@ local CARGO_COLORS = {
 }
 local DEFAULT_CARGO_COLOR = { 0.6, 0.58, 0.55 }
 
-local function load_frame(wagon)
-  return math.floor(wagon.orientation * 2 * LOAD_FRAMES + 0.5) % LOAD_FRAMES
-end
+local function load_frame(wagon) return math.floor(wagon.orientation * 2 * LOAD_FRAMES + 0.5) % LOAD_FRAMES end
 
 -- Shows, updates or removes the cargo heaps of one wagon.
 local function update_cargo(wagon)
@@ -615,7 +645,9 @@ local function update_cargo(wagon)
   end
   local top, most = nil, 0
   for _, item in pairs(inventory.get_contents()) do
-    if item.count > most then top, most = item.name, item.count end
+    if item.count > most then
+      top, most = item.name, item.count
+    end
   end
   local color = CARGO_COLORS[top] or DEFAULT_CARGO_COLOR
   local frame = load_frame(wagon)
@@ -748,6 +780,34 @@ script.on_event(defines.events.on_player_main_inventory_changed, normalize_inven
 script.on_event(defines.events.on_gui_opened, on_gui_opened)
 script.on_event(defines.events.on_gui_closed, on_gui_closed)
 script.on_event(defines.events.on_player_fast_transferred, on_fast_transferred)
+script.on_event({
+  defines.events.on_gui_checked_state_changed,
+  defines.events.on_gui_elem_changed,
+  defines.events.on_gui_selection_state_changed,
+  defines.events.on_gui_text_changed,
+}, circuit.on_gui_changed)
+
+-- Blueprints carry the circuit settings and wires of a station in its tags.
+script.on_event(defines.events.on_player_setup_blueprint, function(event)
+  local player = game.get_player(event.player_index)
+  local blueprint = player.blueprint_to_setup
+  if not (blueprint and blueprint.valid_for_read) then blueprint = player.cursor_stack end
+  if not (blueprint and blueprint.valid_for_read and blueprint.is_blueprint) then return end
+  local mapping = event.mapping.get()
+  for index, entity in pairs(mapping) do
+    local record = entity.valid and storage.stations[entity.unit_number]
+    if record then blueprint.set_blueprint_entity_tag(index, circuit.TAG, circuit.to_tags(record)) end
+  end
+end)
+
+-- Shift + right/left click copies circuit settings between stations.
+script.on_event(defines.events.on_entity_settings_pasted, function(event)
+  local from = event.source.valid and storage.stations[storage.store_owner[event.source.unit_number] or 0]
+  local to = event.destination.valid and storage.stations[storage.store_owner[event.destination.unit_number] or 0]
+  if from and to then circuit.copy(from, to) end
+end)
+
+script.on_nth_tick(3600, circuit.expire_pending)
 
 script.on_nth_tick(TRANSFER_PERIOD, transfer_pass)
 script.on_nth_tick(8, finish_transitions)
@@ -766,8 +826,21 @@ remote.add_interface("bulk-wagons", {
   -- The inventory of a station (unloading pit, portal silo), nil for the belt loader.
   get_inventory = function(entity)
     local record = entity and entity.valid and storage.stations[entity.unit_number]
+    if record and record.base == shared.belt_loader then return nil end
     local store = record and record.store
     return store and store.valid and store.get_inventory(defines.inventory.chest) or nil
+  end,
+  -- Station circuit settings (for tests and other mods): get, or replace with a table.
+  circuit_settings = function(entity, settings)
+    local record = entity and entity.valid and storage.stations[entity.unit_number]
+    if not record then return nil end
+    if settings then record.settings = settings end
+    return circuit.settings(record)
+  end,
+  -- The entity circuit wires attach to.
+  get_store = function(entity)
+    local record = entity and entity.valid and storage.stations[entity.unit_number]
+    return record and record.store
   end,
   is_allowed = function(name) return storage.allowed[name] == true end,
   -- Turns and centres a station on the rail below it, as a hand-built one would be.

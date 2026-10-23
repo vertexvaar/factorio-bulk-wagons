@@ -7,7 +7,7 @@ import os
 import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-FILES = ["info.json", "data.lua", "control.lua", "settings.lua", "shared.lua", "changelog.txt", "thumbnail.png", "README.md"]
+FILES = ["info.json", "data.lua", "control.lua", "circuit.lua", "settings.lua", "shared.lua", "changelog.txt", "thumbnail.png", "README.md"]
 DIRS = ["prototypes", "graphics", "locale"]
 
 

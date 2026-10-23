@@ -148,6 +148,49 @@ local function setup()
   s.belt_loader = surface.create_entity({ name = "bulk-belt-loader", position = { 41, -13 }, force = "player", raise_built = true })
   s.f_belts = belt_run(surface, { 50.5, -13.5 }, { -1, 0 }, 7, defines.direction.west)
 
+  -- Scene G: silo controlled by the circuit network. Enabled while A > 0 from a
+  -- constant combinator, reads the docked wagon's contents and outputs W.
+  rail_line(surface, true, -41, -41, 41)
+  s.wagon_g = train(surface, true, -41, -20, -13)
+  s.wagon_g.get_inventory(defines.inventory.cargo_wagon).insert({ name = "stone", count = 7 })
+  s.silo_g = surface.create_entity({ name = "bulk-loading-station", position = { -41, -13 }, force = "player", raise_built = true })
+  remote.call("bulk-wagons", "get_inventory", s.silo_g).insert({ name = "coal", count = 100 })
+  remote.call("bulk-wagons", "circuit_settings", s.silo_g, {
+    enable = true, signal = { type = "virtual", name = "signal-A" }, comparator = ">", constant = 0,
+    read_wagon = true, docked_signal = true,
+  })
+  s.store_g = remote.call("bulk-wagons", "get_store", s.silo_g)
+  s.cc_g = surface.create_entity({ name = "constant-combinator", position = { -36.5, -10.5 }, force = "player" })
+  s.cc_g.get_wire_connector(defines.wire_connector_id.circuit_red, true)
+    .connect_to(s.store_g.get_wire_connector(defines.wire_connector_id.circuit_red, true))
+
+  -- Scene H: a silo built from a blueprint ghost keeps its settings and wire.
+  s.cc_h = surface.create_entity({ name = "constant-combinator", position = { -52.5, -30.5 }, force = "player" })
+  local ghost = surface.create_entity({
+    name = "entity-ghost", inner_name = "bulk-loading-station", position = { -57, -33 }, force = "player",
+    tags = { bulk_wagons = {
+      enable = true, signal = { type = "virtual", name = "signal-B" }, comparator = "≥", constant = 5, read_wagon = true,
+      wires = { { id = defines.wire_connector_id.circuit_green, target_id = defines.wire_connector_id.circuit_green,
+        name = "constant-combinator", dx = 4.5, dy = 2.5 } },
+    } },
+  })
+  local _, revived = ghost.revive({ raise_revive = true })
+  s.silo_h = revived
+  if s.silo_h then
+    local settings = remote.call("bulk-wagons", "circuit_settings", s.silo_h)
+    report(settings and settings.enable and settings.constant == 5 and settings.comparator == "≥" and settings.read_wagon,
+      "blueprint tags restore circuit settings")
+    local store = remote.call("bulk-wagons", "get_store", s.silo_h)
+    local connections = store and store.get_wire_connector(defines.wire_connector_id.circuit_green, true).connections or {}
+    local wired = false
+    for _, c in pairs(connections) do
+      if c.target.owner == s.cc_h then wired = true end
+    end
+    report(wired, "blueprint tags restore circuit wires", #connections .. " green connections")
+  else
+    report(false, "blueprint ghost revives")
+  end
+
   -- Scene E: a station dropped crosswise and off-centre next to the horizontal track
   -- turns and centres itself, as it does when a player builds it.
   local skewed = surface.create_entity({ name = "bulk-loading-station", position = { 7, 30 }, force = "player" })
@@ -194,6 +237,8 @@ end
 local function check()
   describe()
   local s = storage.scene
+  report(s.wagon_g.get_inventory(defines.inventory.cargo_wagon).get_item_count("coal") == 100,
+    "enabled station loads", s.wagon_g.get_inventory(defines.inventory.cargo_wagon).get_item_count("coal") .. " coal")
   local wagon_a = s.wagon_a.get_inventory(defines.inventory.cargo_wagon)
   local pit = remote.call("bulk-wagons", "get_inventory", s.pit)
   report(count(wagon_a, "iron-plate") == 0, "forbidden item removed from wagon", count(wagon_a, "iron-plate") .. " left")
@@ -240,6 +285,20 @@ script.on_event(defines.events.on_tick, function(event)
   local age = game.tick - storage.start
   if age < 400 then feed() end
   if age == 40 then check_moving() end
+  if age == 60 then
+    local red = defines.wire_connector_id.circuit_red
+    local store = storage.scene.store_g
+    report(store.get_signal({ type = "item", name = "stone" }, red) == 7, "circuit reads docked wagon contents",
+      tostring(store.get_signal({ type = "item", name = "stone" }, red)))
+    report(store.get_signal({ type = "virtual", name = "signal-W" }, red) == 1, "circuit outputs wagon docked signal")
+  end
+  if age == 200 then
+    local s = storage.scene
+    report(remote.call("bulk-wagons", "get_inventory", s.silo_g).get_item_count("coal") == 100,
+      "disabled station does not load")
+    local section = s.cc_g.get_or_create_control_behavior().get_section(1)
+    section.set_slot(1, { value = { type = "virtual", name = "signal-A", quality = "normal", comparator = "=" }, min = 1 })
+  end
   if age == 600 then
     check()
     log("BULKTEST DONE")

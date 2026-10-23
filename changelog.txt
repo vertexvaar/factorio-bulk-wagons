@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.2.0
+Date: 2026-10-23
+  Features:
+    - Circuit network panel next to the station window.
+    - Enable/disable condition: a station only loads or unloads while its condition is true.
+    - Read the contents of the docked wagon, and a "wagon docked" signal (W = 1).
+    - The belt loader can now be wired too (click it to open its window).
+    - Blueprints keep station circuit settings and wires; Shift + right/left click copies settings between stations.
+---------------------------------------------------------------------------------------------------
 Version: 0.1.0
 Date: 2026-10-23
   Features:

@@ -15,7 +15,7 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ENV = os.path.join(ROOT, "tests", ".env")
 DEFAULT_EXE = r"C:\Program Files (x86)\Steam\steamapps\common\Factorio\bin\x64\factorio.exe"
-MOD_FILES = ["info.json", "data.lua", "control.lua", "settings.lua", "shared.lua", "changelog.txt", "thumbnail.png"]
+MOD_FILES = ["info.json", "data.lua", "control.lua", "circuit.lua", "settings.lua", "shared.lua", "changelog.txt", "thumbnail.png"]
 MOD_DIRS = ["prototypes", "graphics", "locale"]
 
 
