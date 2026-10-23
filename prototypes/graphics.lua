@@ -88,7 +88,21 @@ function graphics.wagon_load()
       name = "bulk-wagon-load",
       layers = { sheet(set.load, { frame_count = 128 }) },
     },
-    { type = "mod-data", name = "bulk-wagons-graphics", data = { load = true } },
+  })
+end
+
+-- Tells the script which generated graphics exist (call once, at the end of the data stage).
+function graphics.publish()
+  local extend = {}
+  for name, set in pairs(sprites) do
+    if set.extend then extend[name] = true end
+  end
+  data:extend({
+    {
+      type = "mod-data",
+      name = "bulk-wagons-graphics",
+      data = { load = sprites.wagon ~= nil and sprites.wagon.load ~= nil, extend = extend },
+    },
   })
 end
 

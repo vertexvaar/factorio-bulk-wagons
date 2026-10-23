@@ -63,6 +63,7 @@ local function init_storage()
   -- the data stage reports which generated graphics exist
   local info = prototypes.mod_data["bulk-wagons-graphics"]
   storage.has_load_animation = info ~= nil and info.data.load == true
+  storage.has_extend = info and info.data.extend or {} -- "<key>-<variant>" -> true
 end
 
 --------------------------------------------------------------------------------
@@ -236,8 +237,8 @@ local function set_state(record, state)
   record.switch_at = nil
   if state == "idle" then
     draw_overlay(record, "idle")
-  elseif record.base == shared.loader then
-    -- lower the telescopic chute first, then loop
+  elseif storage.has_extend[SPRITE_KEY[record.base] .. "-" .. record.variant] then
+    -- lower the chute (or raise the flap openers) first, then loop
     draw_overlay(record, "extend")
     record.switch_at = game.tick + EXTEND_TICKS
   else

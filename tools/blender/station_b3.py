@@ -1,209 +1,229 @@
-"""B3 belt loader: an inclined belt conveyor on a lattice tower, discharging through
-a hood and chute into the wagon compartment below.
+"""B3 belt loader in the 2.1 style: a covered belt gallery on a truss climbs from the
+boot at the belt port to a head house over the track; a ribbed telescopic spout
+drops from the head house into the wagon compartment. A braced tower with a caged
+ladder and a railed platform carries the head house.
 
 Run:  blender -b --factory-startup -P tools/blender/station_b3.py -- <out_dir> [variants...]
-Footprint for variant 1: 6 x 2 tiles, rail runs north-south through x in [-1, 1],
-belt port at the east end (x = 2.5, y = -0.5). Variants 2-4 are the same model turned
-by 90 degree steps clockwise.
+Footprint for variant 1: 6 x 2 tiles, rail north-south through x in [-1, 1], port east
+at (2.5, -0.5). Variants 2-4 are the same model turned by 90 degree steps clockwise.
 
-Passes per variant: back (behind/below trains), top (overhead and in front of trains,
-animated: ANIM_FRAMES frames of running belt and spinning gears) and shadow.
+Renders per variant: base, shadow, idle (spout up), extend_000..007 (spout lowers onto
+the wagon, played once) and work_000..007 (belt running, drive turning, spout down).
 """
 import math
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
+import kit  # noqa: E402
 import rig  # noqa: E402
 
 ANIM_FRAMES = 8
+EXTEND_FRAMES = 8
 CLEAT_SPACING = 0.16
-HEAD = (0.05, -0.3, 2.85)  # head pulley centre, above the rail
-TAIL = (2.45, -0.3, 0.42)  # tail pulley in the boot at the port
-BELT_W = 0.56
+HEAD = (0.05, -0.3, 2.75)  # head pulley centre, above the rail
+TAIL = (2.4, -0.3, 0.5)  # tail pulley in the boot at the port
+BELT_W = 0.5
+SPOUT_TOP, SPOUT_UP, SPOUT_DOWN = 2.4, 2.25, 2.0  # bellows spout: top fixed, lower edge raised/lowered
 
-animated = []  # (object, kind, data) moved per frame
-ore = []  # only shown in the working animation
-
-
-def materials():
-    return {
-        "steel": rig.material("steel", (0.30, 0.31, 0.32), roughness=0.4, metallic=0.7, grime=0.3, rust=0.45),
-        "dark": rig.material("dark", (0.06, 0.06, 0.065), roughness=0.5, metallic=0.5, grime=0.2, rust=0.3),
-        "concrete": rig.material("concrete", (0.42, 0.40, 0.37), roughness=0.9, grime=0.4, scale=5, bump=0.4),
-        "yellow": rig.material("yellow", (0.80, 0.58, 0.06), roughness=0.5, grime=0.35, rust=0.5),
-        "hood": rig.material("hood", (0.48, 0.17, 0.06), roughness=0.5, grime=0.35, scale=3, rust=0.6),
-        "rubber": rig.material("rubber", (0.035, 0.035, 0.035), roughness=0.85, grime=0.2, bump=0.3),
-        "roller": rig.material("roller", (0.55, 0.55, 0.55), roughness=0.3, metallic=0.9, grime=0.2),
-        "motor": rig.material("motor", (0.20, 0.28, 0.36), roughness=0.45, metallic=0.3, grime=0.3, rust=0.4),
-        "brass": rig.material("brass", (0.62, 0.45, 0.16), roughness=0.3, metallic=0.9, grime=0.15),
-        "lamp": rig.material("lamp", (1.0, 0.7, 0.3), emission=(1.0, 0.55, 0.15)),
-    }
+moving = []
+spinning = []
+bellows = []  # (object, fraction of the travel)
+ore = []
 
 
 def lerp(a, b, t):
     return tuple(a[i] + t * (b[i] - a[i]) for i in range(3))
 
 
-def footing(name, x, y, m, size=(0.36, 0.36)):
-    rig.box(name, (x, y, 0.06), (size[0], size[1], 0.12), m["concrete"])
-    for dx in (-1, 1):
-        for dy in (-1, 1):
-            rig.cylinder(f"{name}_bolt{dx}{dy}", (x + dx * size[0] * 0.32, y + dy * size[1] * 0.32, 0.1),
-                         (x + dx * size[0] * 0.32, y + dy * size[1] * 0.32, 0.16), 0.02, m["dark"], verts=6)
-
-
-def tower(m):
-    """Lattice tower west of the track carrying the head of the conveyor."""
-    xs, ys, z_top = (-2.6, -1.35), (-0.75, 0.75), 2.95
+def tower(p):
+    """Braced tower west of the track: I-beam columns, cross bracing, caged ladder."""
+    xs, ys, z_top = (-2.55, -1.35), (-0.72, 0.72), 2.6
     for x in xs:
         for y in ys:
-            footing(f"foot{x}{y}", x, y, m)
-            rig.box(f"leg{x}{y}", (x, y, z_top / 2 + 0.06), (0.12, 0.12, z_top - 0.1), m["steel"])
-    for z in (0.9, 1.9):
+            kit.footing(x, y)
+            kit.ibeam((x, y, 0.15), (x, y, z_top), size=0.13)
+    for z in (0.95, 1.8):
         for y in ys:
-            rig.box(f"brace_x{z}{y}", ((xs[0] + xs[1]) / 2, y, z), (xs[1] - xs[0], 0.07, 0.07), m["steel"])
+            kit.ibeam((xs[0], y, z), (xs[1], y, z), size=0.09)
         for x in xs:
-            rig.box(f"brace_y{z}{x}", (x, 0, z), (0.07, ys[1] - ys[0], 0.07), m["steel"])
-    for (z0, z1) in ((0.12, 0.9), (0.9, 1.9), (1.9, z_top)):
+            kit.ibeam((x, ys[0], z), (x, ys[1], z), size=0.09)
+    for (z0, z1) in ((0.2, 0.95), (0.95, 1.8), (1.8, z_top)):
         for y in ys:
-            rig.cylinder(f"diag{z0}{y}", (xs[0], y, z0), (xs[1], y, z1), 0.025, m["steel"], verts=6)
+            rig.cylinder(f"xa{z0}{y}", (xs[0], y, z0), (xs[1], y, z1), 0.022, p["steel"], verts=6)
+            rig.cylinder(f"xb{z0}{y}", (xs[0], y, z1), (xs[1], y, z0), 0.022, p["steel"], verts=6)
         for x in xs:
-            rig.cylinder(f"diagy{z0}{x}", (x, ys[0], z1), (x, ys[1], z0), 0.025, m["steel"], verts=6)
-    # ladder up the west face
-    for y in (-0.2, 0.2):
-        rig.cylinder(f"ladder{y}", (xs[0] - 0.12, y, 0.1), (xs[0] - 0.12, y, z_top), 0.016, m["yellow"])
-    for k in range(12):
-        z = 0.25 + k * 0.23
-        rig.cylinder(f"rung{k}", (xs[0] - 0.12, -0.2, z), (xs[0] - 0.12, 0.2, z), 0.012, m["yellow"])
-    # control cabinet at the foot with a status lamp
-    rig.box("cabinet", (-1.95, -0.62, 0.4), (0.45, 0.28, 0.7), m["motor"])
-    rig.box("cabinet_door", (-1.95, -0.77, 0.42), (0.38, 0.02, 0.6), m["steel"])
-    rig.box("cabinet_lamp", (-1.8, -0.79, 0.68), (0.05, 0.02, 0.05), m["lamp"], bevel=0)
+            rig.cylinder(f"ya{z0}{x}", (x, ys[0], z0), (x, ys[1], z1), 0.022, p["steel"], verts=6)
+    kit.ladder((xs[0] - 0.14, 0.0, 0.1), (xs[0] - 0.14, 0.0, z_top), cage=True)
+    kit.cabinet((-1.95, -0.6, 0.45), (0.45, 0.22, 0.7), facing="-y")
+    kit.cable([(-1.8, -0.6, 0.82), (-1.4, -0.6, 1.2), (-1.38, -0.65, 2.5)], "red")
+    kit.cable([(-1.9, -0.6, 0.82), (-1.36, -0.55, 1.3), (-1.36, -0.6, 2.5)], "blue")
 
 
-def platform_and_drive(m):
-    """Platform on top of the tower with railing, motor, gearbox and exposed gears."""
+def head_house(p):
+    """Platform on the tower, head house over the rail, drive with open gears."""
     rig.layer("top")
-    z = 2.95
-    rig.box("platform", (-1.6, 0, z + 0.04), (2.0, 1.75, 0.08), m["steel"])
-    for k in range(9):
-        rig.box(f"grating{k}", (-2.5 + k * 0.22, 0, z + 0.085), (0.02, 1.7, 0.01), m["dark"], bevel=0)
-    for (p, q) in (((-2.6, -0.85), (-2.6, 0.85)), ((-2.6, 0.85), (-0.7, 0.85))):
-        rig.tube_path(f"railing{p}", [(p[0], p[1], z + 0.08), (p[0], p[1], z + 0.55), (q[0], q[1], z + 0.55), (q[0], q[1], z + 0.08)],
-                      0.018, m["yellow"])
-    # cross beams over the track to the head
+    z = 2.6
+    kit.plate((-1.55, 0, z + 0.03), (2.2, 1.7, 0.06), p["plate"], panels=4)
+    kit.grating((-1.95, 0.35, z + 0.07), (1.2, 0.8))
+    kit.handrail([(-2.65, -0.85, z + 0.06), (-2.65, 0.85, z + 0.06), (-0.5, 0.85, z + 0.06)])
+    # beams stop short of the track so the spout stays in view; the head house hangs
+    # from the gallery truss and two struts
     for y in (-0.72, 0.12):
-        rig.box(f"beam{y}", (-0.55, y, z - 0.02), (2.1, 0.12, 0.16), m["steel"])
-    # electric motor + gearbox driving the head pulley through a gear pair
-    rig.cylinder("motor", (-1.9, -0.45, z + 0.32), (-1.2, -0.45, z + 0.32), 0.2, m["motor"], verts=24)
-    for k in range(8):
-        a = 2 * math.pi * k / 8
-        rig.box(f"motor_fin{k}", (-1.55, -0.45 + math.cos(a) * 0.2, z + 0.32 + math.sin(a) * 0.2), (0.6, 0.03, 0.03), m["motor"], bevel=0,
-                rotation=(a, 0, 0))
-    rig.box("gearbox", (-0.95, -0.45, z + 0.3), (0.4, 0.36, 0.4), m["yellow"])
-    small = rig.gear("gear_small", (-0.95, -0.66, z + 0.42), 0.12, 0.05, 10, m["brass"], axis="y")
-    big = rig.gear("gear_big", (-0.95, -0.66, z + 0.12), 0.2, 0.05, 16, m["brass"], axis="y")
-    animated.append((small, "spin", 2 * math.pi / 10))
-    animated.append((big, "spin", -2 * math.pi / 16))
-    rig.cylinder("drive_shaft", (-0.95, -0.3, HEAD[2]), (HEAD[0], -0.3, HEAD[2]), 0.035, m["roller"])
-    rig.box("warning_light", (-0.7, 0.8, z + 0.65), (0.06, 0.06, 0.06), m["lamp"], bevel=0)
-    rig.cylinder("warning_post", (-0.7, 0.8, z + 0.08), (-0.7, 0.8, z + 0.62), 0.015, m["steel"])
+        kit.ibeam((-2.6, y, z - 0.08), (-0.6, y, z - 0.08), size=0.16)
+    for y in (-0.62, 0.02):
+        rig.cylinder(f"strut{y}", (-0.6, y, z - 0.08), (-0.28, y, 2.75), 0.03, p["steel"], verts=8)
+    # head house: riveted box around the head pulley
+    hx, hy, hz = 0.05, -0.3, 2.85
+    rig.box("head_house", (hx, hy, hz), (0.7, 0.8, 0.62), p["olive"], bevel=0.025)
+    rig.box("head_roof", (hx, hy, hz + 0.33), (0.78, 0.88, 0.05), p["dark"], bevel=0.01)
+    for (a, b, nrm) in (((hx - 0.33, hy - 0.41, hz + 0.27), (hx + 0.33, hy - 0.41, hz + 0.27), (0, -1, 0)),
+                        ((hx - 0.33, hy - 0.41, hz - 0.27), (hx + 0.33, hy - 0.41, hz - 0.27), (0, -1, 0)),
+                        ((hx - 0.36, hy - 0.37, hz - 0.27), (hx - 0.36, hy - 0.37, hz + 0.27), (-1, 0, 0))):
+        kit.rivets(a, b, 7, nrm)
+    rig.box("head_door", (hx - 0.1, hy - 0.41, hz - 0.05), (0.26, 0.015, 0.4), p["dark"], bevel=0.005)
+    kit.hazard((hx, hy - 0.42, hz - 0.29), (0.68, 0.01, 0.06), stripes=6)
+    kit.fan((hx + 0.12, hy, hz + 0.36), radius=0.14, axis="z")
+    kit.lamp((hx + 0.3, hy - 0.38, hz + 0.4), "amber")
+    # drive on the platform: motor, gearbox and an open gear pair
+    kit.motor((-0.95, -0.55, z + 0.22), axis="x", length=0.42, radius=0.15)
+    kit.gearbox((-0.55, -0.55, z + 0.22), (0.3, 0.36, 0.36))
+    big = rig.gear("gear_big", (-0.55, -0.76, z + 0.32), 0.15, 0.04, 16, p["brass"], axis="y")
+    small = rig.gear("gear_small", (-0.32, -0.76, z + 0.48), 0.08, 0.04, 9, p["brass"], axis="y")
+    spinning.append((big, 2 * math.pi / 16))
+    spinning.append((small, -2 * math.pi / 9))
+    rig.cylinder("drive_shaft", (-0.4, -0.3, HEAD[2]), (hx - 0.36, -0.3, HEAD[2]), 0.035, p["chrome"])
+    kit.pipe([(-1.3, 0.6, z + 0.07), (-1.3, 0.6, z + 0.5), (-0.4, 0.6, z + 0.5)], 0.035, p["blue"])
+    # bellows spout under the head house
+    rig.box("spout_collar", (hx, hy, SPOUT_TOP + 0.05), (0.42, 0.42, 0.1), p["dark"], bevel=0.01)
+    rings = 7
+    for k in range(rings):
+        frac = (k + 1) / rings
+        z0 = SPOUT_TOP - frac * (SPOUT_TOP - SPOUT_UP)
+        ring = rig.torus(f"bellow{k}", (hx, hy, z0), 0.17, 0.035, p["rubber"])
+        bellows.append((ring, frac))
+    nozzle = rig.cylinder("spout_nozzle", (hx, hy, SPOUT_UP - 0.08), (hx, hy, SPOUT_UP), 0.15, p["steel"], verts=20)
+    bellows.append((nozzle, 1.0))
+    lip = rig.torus("spout_lip", (hx, hy, SPOUT_UP - 0.08), 0.16, 0.02, p["yellow"])
+    bellows.append((lip, 1.0))
 
 
-def conveyor(m):
-    """Inclined trough conveyor from the boot at the port up to the head over the rail."""
+def gallery(p):
+    """Inclined belt gallery: truss underneath, cover sheets, walkway with handrail."""
     rig.layer("top")
     dx, dz = HEAD[0] - TAIL[0], HEAD[2] - TAIL[2]
     length = math.hypot(dx, dz)
-    angle = math.atan2(dz, -dx)  # rise towards -x
+    angle = math.atan2(dz, -dx)
     mid = lerp(TAIL, HEAD, 0.5)
-    # side stringers
+    kit.lattice((TAIL[0] - 0.1, TAIL[1], TAIL[2] - 0.22), (HEAD[0] + 0.3, HEAD[1], HEAD[2] - 0.22), 0.62, 0.22, 7)
     for s in (-1, 1):
-        rig.box(f"stringer{s}", (mid[0], TAIL[1] + s * (BELT_W / 2 + 0.06), mid[2] - 0.02), (length + 0.2, 0.06, 0.16), m["steel"],
+        rig.box(f"stringer{s}", (mid[0], TAIL[1] + s * (BELT_W / 2 + 0.06), mid[2] - 0.02), (length, 0.05, 0.14), p["steel"],
                 rotation=(0, angle, 0))
-        # cover hoods over the belt every few segments
-    # belt surface (top run)
-    rig.box("belt", (mid[0], TAIL[1], mid[2] + 0.07), (length, BELT_W, 0.03), m["rubber"], bevel=0, rotation=(0, angle, 0))
-    # idler rollers under the belt
-    n = int(length / 0.35)
+    rig.box("belt", (mid[0], TAIL[1], mid[2] + 0.06), (length, BELT_W, 0.03), p["rubber"], bevel=0, rotation=(0, angle, 0))
+    n = int(length / 0.3)
     for k in range(1, n):
-        p = lerp(TAIL, HEAD, k / n)
-        rig.cylinder(f"idler{k}", (p[0], TAIL[1] - BELT_W / 2, p[2] + 0.03), (p[0], TAIL[1] + BELT_W / 2, p[2] + 0.03), 0.035, m["roller"],
-                     verts=12)
-    # cleats on the belt, moved along the belt per frame
+        q = lerp(TAIL, HEAD, k / n)
+        rig.cylinder(f"idler{k}", (q[0], TAIL[1] - BELT_W / 2, q[2] + 0.02), (q[0], TAIL[1] + BELT_W / 2, q[2] + 0.02), 0.03, p["chrome"],
+                     verts=10)
+    # cover sheets on every other bay, the gaps show the running belt
+    for k in range(0, n, 2):
+        q = lerp(TAIL, HEAD, (k + 0.5) / n)
+        rig.box(f"cover{k}", (q[0], TAIL[1], q[2] + 0.18), (length / n * 0.95, BELT_W + 0.14, 0.04), p["olive"], bevel=0.015,
+                rotation=(0, angle, 0))
+    # walkway with handrail on the south side
+    wy = TAIL[1] - BELT_W / 2 - 0.3
+    rig.box("walkway", (mid[0], wy, mid[2] - 0.08), (length, 0.26, 0.03), p["steel"], bevel=0.005, rotation=(0, angle, 0))
+    kit.handrail([(TAIL[0], wy - 0.12, TAIL[2] - 0.06), (HEAD[0] + 0.35, wy - 0.12, HEAD[2] - 0.06)], height=0.4, posts_every=0.5)
     count = int(length / CLEAT_SPACING)
     for k in range(count):
         t = k / count
-        p = lerp(TAIL, HEAD, t)
-        cleat = rig.box(f"cleat{k}", (p[0], TAIL[1], p[2] + 0.095), (0.025, BELT_W - 0.06, 0.02), m["dark"], bevel=0,
+        q = lerp(TAIL, HEAD, t)
+        cleat = rig.box(f"cleat{k}", (q[0], TAIL[1], q[2] + 0.085), (0.025, BELT_W - 0.06, 0.02), p["dark"], bevel=0,
                         rotation=(0, angle, 0))
-        animated.append((cleat, "slide", (t, length, 0.095)))
-    # ore on the belt: little heaps every other cleat
-    for k in range(0, count, 2):
-        t = (k + 0.5) / count
-        p = lerp(TAIL, HEAD, t)
-        heap = rig.box(f"ore{k}", (p[0], TAIL[1], p[2] + 0.11), (0.08, 0.18, 0.04), m["concrete"], bevel=0.02,
-                       rotation=(0, angle, 0))
-        animated.append((heap, "slide", (t, length, 0.11)))
-        ore.append(heap)
-    # head pulley with hood and chute into the wagon
-    rig.cylinder("head_pulley", (HEAD[0], TAIL[1] - BELT_W / 2, HEAD[2]), (HEAD[0], TAIL[1] + BELT_W / 2, HEAD[2]), 0.12, m["roller"])
-    rig.mesh("hood", [
-        (-0.42, -0.72, 2.55), (0.42, -0.72, 2.55), (0.42, 0.12, 2.55), (-0.42, 0.12, 2.55),
-        (-0.3, -0.72, 3.18), (0.32, -0.72, 3.18), (0.32, 0.12, 3.18), (-0.3, 0.12, 3.18),
-    ], [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7)], m["hood"], bevel=0.015)
-    rig.mesh("chute", [
-        (-0.36, -0.66, 2.55), (0.36, -0.66, 2.55), (0.36, 0.06, 2.55), (-0.36, 0.06, 2.55),
-        (-0.2, -0.48, 2.12), (0.2, -0.48, 2.12), (0.2, -0.12, 2.12), (-0.2, -0.12, 2.12),
-    ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], m["hood"], bevel=0.01)
-    rig.box("chute_lip", (0, -0.3, 2.1), (0.44, 0.4, 0.04), m["dark"])
-    # hazard stripes on the hood
-    for k in range(6):
-        rig.box(f"stripe{k}", (-0.3 + k * 0.12, -0.735, 2.62), (0.05, 0.01, 0.1), m["yellow"], bevel=0, rotation=(0, 0.6, 0))
+        moving.append((cleat, t, length, 0.085))
+        if k % 2 == 0:
+            heap = rig.box(f"ore{k}", (q[0], TAIL[1], q[2] + 0.1), (0.08, 0.18, 0.04), p["concrete"], bevel=0.02, rotation=(0, angle, 0))
+            moving.append((heap, t + 0.5 / count, length, 0.1))
+            ore.append(heap)
 
 
-def boot_and_support(m):
+def boot(p):
+    """Boot at the belt port: receiving hopper, tail pulley, take-up with counterweight."""
     rig.layer("base")
-    # boot housing with the tail pulley, fed by the belt arriving from the east
-    rig.box("boot", (2.45, -0.3, 0.28), (0.8, BELT_W + 0.2, 0.5), m["steel"])
-    rig.mesh("boot_funnel", [
-        (2.15, -0.7, 0.53), (2.95, -0.7, 0.53), (2.95, 0.1, 0.53), (2.15, 0.1, 0.53),
-        (2.25, -0.55, 0.72), (2.95, -0.55, 0.72), (2.95, -0.05, 0.72), (2.25, -0.05, 0.72),
-    ], [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)], m["yellow"], bevel=0.01)
-    footing("boot_foot", 2.45, 0.55, m, (0.5, 0.4))
-    rig.box("takeup", (2.45, 0.55, 0.35), (0.22, 0.22, 0.45), m["dark"])
-    # A-frame supporting the incline east of the track
-    p = lerp(TAIL, HEAD, 0.45)
-    for y in (-0.75, 0.15):
-        footing(f"aframe_foot{y}", 1.5, y, m, (0.3, 0.3))
-        rig.cylinder(f"aframe{y}", (1.5, y, 0.12), (p[0], TAIL[1] + (y + 0.3) * 0.5, p[2] - 0.08), 0.045, m["steel"], verts=8)
-    rig.cylinder("aframe_tie", (1.5, -0.75, 0.6), (1.5, 0.15, 0.6), 0.03, m["steel"], verts=8)
+    kit.footing(2.45, -0.3, (0.9, 0.8))
+    rig.box("boot", (2.45, -0.3, 0.4), (0.78, 0.66, 0.5), p["olive"], bevel=0.02)
+    kit.rivets((2.08, -0.64, 0.6), (2.82, -0.64, 0.6), 7, (0, -1, 0))
+    kit.rivets((2.08, -0.64, 0.2), (2.82, -0.64, 0.2), 7, (0, -1, 0))
+    rig.mesh("boot_hopper", [
+        (2.1, -0.65, 0.66), (2.95, -0.65, 0.66), (2.95, 0.05, 0.66), (2.1, 0.05, 0.66),
+        (2.2, -0.5, 0.86), (2.95, -0.5, 0.86), (2.95, -0.1, 0.86), (2.2, -0.1, 0.86),
+    ], [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)], p["yellow"], bevel=0.01)
+    rig.cylinder("tail_pulley", (2.45, -0.62, 0.5), (2.45, 0.02, 0.5), 0.1, p["chrome"])
+    # gravity take-up tower with counterweight north of the boot
+    for y in (0.35, 0.75):
+        kit.ibeam((2.3, y, 0.1), (2.3, y, 1.1), size=0.08)
+        kit.ibeam((2.65, y, 0.1), (2.65, y, 1.1), size=0.08)
+    rig.box("counterweight", (2.47, 0.55, 0.7), (0.3, 0.32, 0.32), p["concrete"], bevel=0.02)
+    kit.hazard((2.47, 0.38, 0.7), (0.3, 0.01, 0.3), stripes=4)
+    # A-frame under the gallery
+    q = lerp(TAIL, HEAD, 0.42)
+    for y in (-0.72, 0.12):
+        kit.footing(1.5, y, (0.3, 0.3))
+        kit.ibeam((1.5, y, 0.14), (q[0], TAIL[1] + (y + 0.3) * 0.45, q[2] - 0.32), size=0.1)
 
 
 def build():
     rig.reset()
-    m = materials()
+    kit.reset()
+    p = kit.palette()
     rig.layer("base")
-    tower(m)
-    boot_and_support(m)
-    conveyor(m)
-    platform_and_drive(m)
+    tower(p)
+    boot(p)
+    gallery(p)
+    head_house(p)
     rig.layer("base")
     rig.sun()
     rig.fill_light()
     rig.camera(9, 10, shift_y=1.8)
 
 
+def set_spout(extension):
+    drop = (SPOUT_UP - SPOUT_DOWN) * extension
+    for obj, frac in bellows:
+        z0 = obj.get("z0")
+        if z0 is None:
+            obj["z0"] = z0 = obj.location.z
+        obj.location.z = z0 - drop * frac
+
+
 def pose(frame):
     t = frame / ANIM_FRAMES
-    for obj, kind, data in animated:
-        if kind == "spin":
-            obj.rotation_euler[2] = data * frame
-        elif kind == "slide":
-            start, length, dz = data
-            p = lerp(TAIL, HEAD, (start + t * 2 * CLEAT_SPACING / length) % 1.0)
-            obj.location = (p[0], obj.location[1], p[2] + dz)
+    for obj, start, length, dz in moving:
+        q = lerp(TAIL, HEAD, (start + t * 2 * CLEAT_SPACING / length) % 1.0)
+        obj.location = (q[0], obj.location[1], q[2] + dz)
+    for pivot, step in spinning:
+        pivot.rotation_euler[2] = step * frame
+
+
+def render_variant(out, v):
+    d = os.path.join(out, f"v{v}")
+    orient = (v - 1) / 4
+    for o in ore:
+        o.hide_render = True
+    set_spout(0)
+    pose(0)
+    rig.render_frames(d, [0], lambda i: orient, passes=("base", "shadow", "top"), samples=32)
+    os.replace(os.path.join(d, "top_000.png"), os.path.join(d, "idle_000.png"))
+    rig.render_frames(d, list(range(EXTEND_FRAMES)), lambda i: orient, passes=("top",), samples=32,
+                      pose=lambda i: set_spout((i + 1) / EXTEND_FRAMES))
+    for i in range(EXTEND_FRAMES):
+        os.replace(os.path.join(d, f"top_{i:03d}.png"), os.path.join(d, f"extend_{i:03d}.png"))
+    for o in ore:
+        o.hide_render = False
+    rig.render_frames(d, list(range(ANIM_FRAMES)), lambda i: orient, passes=("top",), samples=32,
+                      pose=lambda i: (set_spout(1), pose(i)))
+    for i in range(ANIM_FRAMES):
+        os.replace(os.path.join(d, f"top_{i:03d}.png"), os.path.join(d, f"work_{i:03d}.png"))
 
 
 if __name__ == "__main__":
@@ -212,12 +232,4 @@ if __name__ == "__main__":
     variants = [int(x) for x in a[1:]] or [1, 2, 3, 4]
     build()
     for v in variants:
-        d = os.path.join(out, f"v{v}")
-        orient = (v - 1) / 4
-        for o in ore:
-            o.hide_render = True
-        rig.render_frames(d, [0], lambda i: orient, passes=("base", "shadow", "top"), samples=32, pose=pose)
-        os.replace(os.path.join(d, "top_000.png"), os.path.join(d, "idle_000.png"))
-        for o in ore:
-            o.hide_render = False
-        rig.render_frames(d, list(range(ANIM_FRAMES)), lambda i: orient, passes=("top",), samples=32, pose=pose)
+        render_variant(out, v)

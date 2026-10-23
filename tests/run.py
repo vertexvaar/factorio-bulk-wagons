@@ -30,7 +30,7 @@ def prepare(space_age, harness="bulk-wagons-test"):
     for d in MOD_DIRS:
         shutil.copytree(os.path.join(ROOT, d), os.path.join(target, d))
     shutil.copytree(os.path.join(ROOT, "tests", harness), os.path.join(mods, harness))
-    names = ["base", "elevated-rails", "quality", "space-age", "bulk-wagons", harness]
+    names = ["base", "elevated-rails", "quality", "recycler", "space-age", "bulk-wagons", harness]
     with open(os.path.join(mods, "mod-list.json"), "w") as f:
         json.dump({"mods": [{"name": n, "enabled": space_age or n == "base" or n.startswith("bulk")} for n in names]}, f)
     write = os.path.join(ENV, "write")

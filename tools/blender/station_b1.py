@@ -1,177 +1,158 @@
-"""B1 portal silo: a steel portal over the track carrying a silo bin, filled by a
-bucket elevator at the belt port, emptying through a telescopic chute.
+"""B1 portal silo in the 2.1 style: a riveted silo bin on a braced steel portal over
+the track, filled by a bucket elevator at the belt port and emptied through a slide
+gate and a bellows chute that lowers onto the wagon.
 
 Run:  blender -b --factory-startup -P tools/blender/station_b1.py -- <out_dir> [variants...]
 Footprint for variant 1: 6 x 2 tiles, rail north-south through x in [-1, 1], port east.
 
-Passes per variant: base, shadow, idle top (chute retracted), then
-  extend_000..extend_{EXTEND_FRAMES-1}: the chute lowering onto a wagon (played once),
-  work_000..work_{ANIM_FRAMES-1}: loading loop (elevator drive spinning, chute down).
+Renders per variant: base, shadow, idle (chute up), extend_000..007 (chute lowers onto
+the wagon, played once) and work_000..007 (elevator drive turning, chute down).
 """
 import math
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
+import kit  # noqa: E402
 import rig  # noqa: E402
 
 ANIM_FRAMES = 8
 EXTEND_FRAMES = 8
 LEG_X, LEG_Y = 1.62, 0.78
 PORTAL_Z = 3.0
-BIN_BOTTOM, BIN_TOP = 3.45, 4.65
-CHUTE_UP, CHUTE_DOWN = 2.85, 2.08  # lower edge of the telescopic chute
+BIN_BOTTOM, BIN_TOP = 3.5, 4.7
 BIN_Y = 0.22  # the bin sits to the north so the chute stays visible in front of it
+HW, HD = 1.15, 0.72
 CHUTE_Y = -0.42
+CHUTE_TOP, CHUTE_UP, CHUTE_DOWN = 3.0, 2.75, 2.06
 
-spinning = []  # (pivot, step per frame)
-telescope = []  # (object, fraction of the travel it moves)
-
-
-def materials():
-    return {
-        "steel": rig.material("steel", (0.30, 0.31, 0.32), roughness=0.4, metallic=0.7, grime=0.3, rust=0.45),
-        "bin": rig.material("bin", (0.38, 0.39, 0.40), roughness=0.45, metallic=0.5, grime=0.35, scale=2, rust=0.5),
-        "dark": rig.material("dark", (0.06, 0.06, 0.065), roughness=0.5, metallic=0.5, grime=0.2, rust=0.3),
-        "concrete": rig.material("concrete", (0.42, 0.40, 0.37), roughness=0.9, grime=0.4, scale=5, bump=0.4),
-        "yellow": rig.material("yellow", (0.80, 0.58, 0.06), roughness=0.5, grime=0.35, rust=0.5),
-        "accent": rig.material("accent", (0.48, 0.17, 0.06), roughness=0.5, grime=0.35, scale=3, rust=0.6),
-        "roller": rig.material("roller", (0.55, 0.55, 0.55), roughness=0.3, metallic=0.9, grime=0.2),
-        "motor": rig.material("motor", (0.20, 0.28, 0.36), roughness=0.45, metallic=0.3, grime=0.3, rust=0.4),
-        "brass": rig.material("brass", (0.62, 0.45, 0.16), roughness=0.3, metallic=0.9, grime=0.15),
-        "lamp": rig.material("lamp", (1.0, 0.7, 0.3), emission=(1.0, 0.55, 0.15)),
-        "green": rig.material("green", (0.3, 1.0, 0.4), emission=(0.2, 1.0, 0.3)),
-    }
+spinning = []
+bellows = []
 
 
-def footing(name, x, y, m, size=(0.42, 0.42)):
-    rig.box(name, (x, y, 0.07), (size[0], size[1], 0.14), m["concrete"])
-    for dx in (-1, 1):
-        for dy in (-1, 1):
-            rig.cylinder(f"{name}_bolt{dx}{dy}", (x + dx * size[0] * 0.32, y + dy * size[1] * 0.32, 0.12),
-                         (x + dx * size[0] * 0.32, y + dy * size[1] * 0.32, 0.19), 0.022, m["dark"], verts=6)
-
-
-def portal(m):
+def portal(p):
     rig.layer("base")
     for x in (-LEG_X, LEG_X):
         for y in (-LEG_Y, LEG_Y):
-            footing(f"foot{x}{y}", x, y, m)
-            # H-section legs: flanges and web
-            for dy in (-0.07, 0.07):
-                rig.box(f"leg{x}{y}{dy}", (x, y + dy, PORTAL_Z / 2 + 0.07), (0.2, 0.025, PORTAL_Z - 0.1), m["steel"])
-            rig.box(f"web{x}{y}", (x, y, PORTAL_Z / 2 + 0.07), (0.03, 0.14, PORTAL_Z - 0.1), m["steel"])
-        # side bracing between the two legs of a frame
-        rig.cylinder(f"xbrace_a{x}", (x, -LEG_Y, 0.4), (x, LEG_Y, 2.2), 0.03, m["steel"], verts=6)
-        rig.cylinder(f"xbrace_b{x}", (x, LEG_Y, 0.4), (x, -LEG_Y, 2.2), 0.03, m["steel"], verts=6)
-        rig.box(f"tie{x}", (x, 0, 2.3), (0.08, 2 * LEG_Y, 0.08), m["steel"])
-    # yellow/black impact guards at the foot of the legs facing the track
-    for x in (-LEG_X, LEG_X):
-        for y in (-LEG_Y, LEG_Y):
-            for k in range(4):
-                rig.box(f"guard{x}{y}{k}", (x - math.copysign(0.13, x), y, 0.25 + k * 0.12), (0.02, 0.22, 0.1),
-                        m["yellow"] if k % 2 == 0 else m["dark"], bevel=0)
+            kit.footing(x, y, (0.46, 0.46), 0.16)
+            kit.ibeam((x, y, 0.18), (x, y, PORTAL_Z - 0.1), size=0.2)
+            for k in range(4):  # impact guard facing the track
+                rig.box(f"guard{x}{y}{k}", (x - math.copysign(0.14, x), y, 0.3 + k * 0.13), (0.02, 0.24, 0.11),
+                        p["yellow"] if k % 2 == 0 else p["dark"], bevel=0)
+        rig.cylinder(f"xbrace_a{x}", (x, -LEG_Y, 0.45), (x, LEG_Y, 2.3), 0.03, p["steel"], verts=6)
+        rig.cylinder(f"xbrace_b{x}", (x, LEG_Y, 0.45), (x, -LEG_Y, 2.3), 0.03, p["steel"], verts=6)
+        kit.ibeam((x, -LEG_Y, 2.4), (x, LEG_Y, 2.4), size=0.1)
+    kit.ladder((-LEG_X - 0.2, 0.25, 0.15), (-LEG_X - 0.2, 0.25, PORTAL_Z + 0.1), cage=True)
+    kit.cabinet((-2.3, -0.55, 0.42), (0.45, 0.22, 0.66), facing="-y")
+    kit.cable([(-2.2, -0.55, 0.76), (-1.9, -0.6, 1.3), (-1.75, -0.7, 2.9)], "red")
+    kit.cable([(-2.35, -0.55, 0.76), (-1.95, -0.5, 1.2), (-1.78, -0.62, 2.9)], "green")
 
 
-def bin_and_chute(m):
+def bin_and_chute(p):
     rig.layer("top")
-    # portal girders and walkway around the bin
     for y in (-LEG_Y, LEG_Y):
-        rig.box(f"girder{y}", (0, y, PORTAL_Z), (2 * LEG_X + 0.3, 0.2, 0.3), m["steel"])
+        kit.ibeam((-LEG_X - 0.15, y, PORTAL_Z), (LEG_X + 0.15, y, PORTAL_Z), size=0.28)
     for x in (-LEG_X, LEG_X):
-        rig.box(f"girder_x{x}", (x, 0, PORTAL_Z), (0.2, 2 * LEG_Y + 0.2, 0.3), m["steel"])
-    for x in (-1, 1):  # walkways left and right of the chute opening
-        rig.box(f"walkway{x}", (x * (LEG_X - 0.15), 0, PORTAL_Z + 0.17), (0.9, 2 * LEG_Y + 0.4, 0.05), m["steel"])
-        for k in range(4):
-            rig.box(f"grate{x}{k}", (x * (LEG_X - 0.5 + k * 0.23), 0, PORTAL_Z + 0.2), (0.02, 2 * LEG_Y + 0.35, 0.01), m["dark"], bevel=0)
-    rig.box("walkway_n", (0, LEG_Y - 0.05, PORTAL_Z + 0.17), (2 * LEG_X, 0.5, 0.05), m["steel"])
-    corners = [(-LEG_X - 0.22, -LEG_Y - 0.17), (LEG_X + 0.22, -LEG_Y - 0.17), (LEG_X + 0.22, LEG_Y + 0.17), (-LEG_X - 0.22, LEG_Y + 0.17)]
-    for i in range(4):
-        a, b = corners[i], corners[(i + 1) % 4]
-        rig.cylinder(f"handrail{i}", (a[0], a[1], PORTAL_Z + 0.65), (b[0], b[1], PORTAL_Z + 0.65), 0.018, m["yellow"])
-        rig.cylinder(f"midrail{i}", (a[0], a[1], PORTAL_Z + 0.42), (b[0], b[1], PORTAL_Z + 0.42), 0.012, m["yellow"])
-        for k in range(5):
-            p = (a[0] + (b[0] - a[0]) * k / 4, a[1] + (b[1] - a[1]) * k / 4)
-            rig.cylinder(f"stanchion{i}{k}", (p[0], p[1], PORTAL_Z + 0.2), (p[0], p[1], PORTAL_Z + 0.65), 0.016, m["yellow"])
-
-    # silo bin: box with stiffeners, cone down into the chute
-    hw, hd = 1.15, 0.72
-    rig.box("bin", (0, BIN_Y, (BIN_BOTTOM + BIN_TOP) / 2), (2 * hw, 2 * hd, BIN_TOP - BIN_BOTTOM), m["bin"], bevel=0.02)
-    for k in range(7):
-        x = -hw + 0.1 + k * (2 * hw - 0.2) / 6
-        for y in (-hd - 0.02, hd + 0.02):
-            rig.box(f"bin_rib{k}{y}", (x, y + BIN_Y, (BIN_BOTTOM + BIN_TOP) / 2), (0.06, 0.04, BIN_TOP - BIN_BOTTOM), m["bin"])
-    for z in (BIN_BOTTOM + 0.4, BIN_BOTTOM + 0.8):
-        rig.box(f"bin_band{z}", (0, BIN_Y, z), (2 * hw + 0.04, 2 * hd + 0.04, 0.05), m["steel"])
-    rig.box("bin_roof", (0, BIN_Y, BIN_TOP + 0.04), (2 * hw + 0.1, 2 * hd + 0.1, 0.08), m["steel"])
+        kit.ibeam((x, -LEG_Y - 0.1, PORTAL_Z), (x, LEG_Y + 0.1, PORTAL_Z), size=0.24)
+    # walkways left and right of the chute opening, railed all round
+    for sx in (-1, 1):
+        kit.grating((sx * (LEG_X - 0.12), 0, PORTAL_Z + 0.17), (0.75, 2 * LEG_Y + 0.35))
+    kit.grating((0, LEG_Y - 0.02, PORTAL_Z + 0.17), (2 * LEG_X - 0.9, 0.42))
+    x0, x1, y0, y1 = -LEG_X - 0.5, LEG_X + 0.5, -LEG_Y - 0.17, LEG_Y + 0.17
+    kit.handrail([(x0, y0, PORTAL_Z + 0.19), (x1, y0, PORTAL_Z + 0.19), (x1, y1, PORTAL_Z + 0.19), (x0, y1, PORTAL_Z + 0.19),
+                  (x0, y0, PORTAL_Z + 0.19)], height=0.5)
+    # the bin: riveted plate walls, ring stiffeners, roof
+    zc = (BIN_BOTTOM + BIN_TOP) / 2
+    h = BIN_TOP - BIN_BOTTOM
+    kit.plate((0, BIN_Y - HD, zc), (2 * HW, 0.05, h), p["plate"], axis="y")
+    kit.plate((0, BIN_Y + HD, zc), (2 * HW, 0.05, h), p["plate"], axis="y")
+    kit.plate((-HW, BIN_Y, zc), (0.05, 2 * HD, h), p["plate"], axis="x")
+    kit.plate((HW, BIN_Y, zc), (0.05, 2 * HD, h), p["plate"], axis="x")
+    for z in (BIN_BOTTOM + 0.35, BIN_BOTTOM + 0.8):
+        for y in (BIN_Y - HD - 0.05, BIN_Y + HD + 0.05):
+            kit.ibeam((-HW - 0.05, y, z), (HW + 0.05, y, z), size=0.07)
+    for k in range(5):
+        x = -HW + 0.25 + k * (2 * HW - 0.5) / 4
+        rig.box(f"bin_post{k}", (x, BIN_Y - HD - 0.04, zc), (0.06, 0.05, h), p["steel"], bevel=0.005)
+    kit.plate((0, BIN_Y, BIN_TOP + 0.03), (2 * HW + 0.08, 2 * HD + 0.08, 0.06), p["plate"], panels=3)
+    kit.handrail([(-HW, BIN_Y - HD, BIN_TOP + 0.06), (HW, BIN_Y - HD, BIN_TOP + 0.06)], height=0.35, posts_every=0.5)
+    # cone down to the slide gate
     rig.mesh("cone", [
-        (-hw, BIN_Y - hd, BIN_BOTTOM), (hw, BIN_Y - hd, BIN_BOTTOM), (hw, BIN_Y + hd, BIN_BOTTOM), (-hw, BIN_Y + hd, BIN_BOTTOM),
-        (-0.24, CHUTE_Y - 0.24, PORTAL_Z + 0.25), (0.24, CHUTE_Y - 0.24, PORTAL_Z + 0.25), (0.24, CHUTE_Y + 0.24, PORTAL_Z + 0.25),
-        (-0.24, CHUTE_Y + 0.24, PORTAL_Z + 0.25),
-    ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], m["bin"], bevel=0.015)
-    # fill level lamps on the south face and a dust filter on the roof
-    for k in range(3):
-        rig.box(f"level{k}", (-0.7 + k * 0.18, BIN_Y - hd - 0.045, BIN_TOP - 0.25), (0.08, 0.02, 0.08), m["green"] if k < 2 else m["lamp"], bevel=0)
-    rig.cylinder("filter", (-0.6, 0.4, BIN_TOP + 0.08), (-0.6, 0.4, BIN_TOP + 0.55), 0.22, m["steel"], verts=20)
-    rig.cylinder("filter_cap", (-0.6, 0.4, BIN_TOP + 0.55), (-0.6, 0.4, BIN_TOP + 0.6), 0.25, m["dark"], verts=20)
-    rig.cylinder("vent", (0.5, 0.35, BIN_TOP + 0.08), (0.5, 0.35, BIN_TOP + 0.4), 0.07, m["steel"], verts=12)
+        (-HW, BIN_Y - HD, BIN_BOTTOM), (HW, BIN_Y - HD, BIN_BOTTOM), (HW, BIN_Y + HD, BIN_BOTTOM), (-HW, BIN_Y + HD, BIN_BOTTOM),
+        (-0.24, CHUTE_Y - 0.24, PORTAL_Z + 0.3), (0.24, CHUTE_Y - 0.24, PORTAL_Z + 0.3), (0.24, CHUTE_Y + 0.24, PORTAL_Z + 0.3),
+        (-0.24, CHUTE_Y + 0.24, PORTAL_Z + 0.3),
+    ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], p["plate"], bevel=0.015)
+    for k in range(5):
+        t = (k + 1) / 6
+        a = (-HW + t * 2 * HW, BIN_Y - HD, BIN_BOTTOM)
+        b = (-0.24 + t * 0.48, CHUTE_Y - 0.24, PORTAL_Z + 0.3)
+        rig.cylinder(f"cone_rib{k}", a, b, 0.02, p["steel"], verts=6)
+    # roof equipment: dust filter, fan, vent, level lamps
+    rig.cylinder("filter", (-0.6, BIN_Y + 0.2, BIN_TOP + 0.06), (-0.6, BIN_Y + 0.2, BIN_TOP + 0.6), 0.22, p["olive"], verts=24)
+    rig.cylinder("filter_cap", (-0.6, BIN_Y + 0.2, BIN_TOP + 0.6), (-0.6, BIN_Y + 0.2, BIN_TOP + 0.66), 0.25, p["dark"], verts=24)
+    kit.bolts_around((-0.6, BIN_Y + 0.2, BIN_TOP + 0.66), (0, 0, 1), 0.2, 10)
+    kit.fan((0.45, BIN_Y + 0.2, BIN_TOP + 0.08), radius=0.18, axis="z")
+    kit.pipe([(0.9, BIN_Y + 0.45, BIN_TOP + 0.06), (0.9, BIN_Y + 0.45, BIN_TOP + 0.4), (0.6, BIN_Y + 0.45, BIN_TOP + 0.4)], 0.04,
+             p["steel"])
+    for k, col in enumerate(("green", "green", "amber")):
+        kit.lamp((-0.85 + k * 0.16, BIN_Y - HD - 0.06, BIN_TOP - 0.18), col, size=0.04)
+    # slide gate with hydraulic ram, then the bellows chute
+    rig.box("slide_gate", (0, CHUTE_Y, PORTAL_Z + 0.22), (0.62, 0.62, 0.14), p["red"], bevel=0.015)
+    kit.rivets((-0.28, CHUTE_Y - 0.32, PORTAL_Z + 0.26), (0.28, CHUTE_Y - 0.32, PORTAL_Z + 0.26), 6, (0, -1, 0))
+    rig.cylinder("gate_ram", (0.32, CHUTE_Y - 0.18, PORTAL_Z + 0.22), (0.85, CHUTE_Y - 0.18, PORTAL_Z + 0.22), 0.035, p["chrome"])
+    rig.cylinder("gate_ram_body", (0.85, CHUTE_Y - 0.18, PORTAL_Z + 0.22), (1.3, CHUTE_Y - 0.18, PORTAL_Z + 0.22), 0.065, p["yellow"])
+    kit.hose([(1.3, CHUTE_Y - 0.18, PORTAL_Z + 0.22), (1.5, CHUTE_Y + 0.1, PORTAL_Z + 0.35), (1.45, CHUTE_Y + 0.5, PORTAL_Z + 0.25)],
+             0.025, p["rubber"], ribs_per_tile=20)
+    rig.cylinder("chute_collar", (0, CHUTE_Y, CHUTE_TOP - 0.05), (0, CHUTE_Y, CHUTE_TOP + 0.12), 0.22, p["dark"], verts=24)
+    rings = 8
+    for k in range(rings):
+        frac = (k + 1) / rings
+        z0 = CHUTE_TOP - frac * (CHUTE_TOP - CHUTE_UP)
+        bellows.append((rig.torus(f"bellow{k}", (0, CHUTE_Y, z0), 0.19, 0.04, p["rubber"]), frac))
+    bellows.append((rig.cylinder("nozzle", (0, CHUTE_Y, CHUTE_UP - 0.1), (0, CHUTE_Y, CHUTE_UP), 0.17, p["steel"], verts=24), 1.0))
+    bellows.append((rig.torus("nozzle_lip", (0, CHUTE_Y, CHUTE_UP - 0.1), 0.18, 0.022, p["yellow"]), 1.0))
+    for x in (-0.3, 0.3):  # winch cables
+        bellows.append((rig.cylinder(f"cable{x}", (x, CHUTE_Y, CHUTE_UP), (x, CHUTE_Y, CHUTE_TOP), 0.008, p["dark"], verts=6), 1.0))
 
-    # telescopic chute: three nested segments, slide gate and hydraulic cylinder
-    rig.box("slide_gate", (0, CHUTE_Y, PORTAL_Z + 0.2), (0.62, 0.62, 0.12), m["accent"])
-    rig.cylinder("gate_ram", (0.32, CHUTE_Y - 0.2, PORTAL_Z + 0.2), (0.9, CHUTE_Y - 0.2, PORTAL_Z + 0.2), 0.04, m["roller"])
-    rig.cylinder("gate_ram_body", (0.9, CHUTE_Y - 0.2, PORTAL_Z + 0.2), (1.3, CHUTE_Y - 0.2, PORTAL_Z + 0.2), 0.065, m["yellow"])
-    for k, (r, frac) in enumerate(((0.26, 0.0), (0.22, 0.5), (0.18, 1.0))):
-        seg = rig.cylinder(f"tele{k}", (0, CHUTE_Y, CHUTE_UP), (0, CHUTE_Y, CHUTE_UP + 0.38), r, m["roller"] if k else m["steel"], verts=24)
-        ring = rig.torus(f"tele_ring{k}", (0, CHUTE_Y, CHUTE_UP + 0.36), r + 0.01, 0.025, m["dark"])
-        telescope.append((seg, frac))
-        telescope.append((ring, frac))
-    skirt = rig.cylinder("skirt", (0, CHUTE_Y, CHUTE_UP - 0.06), (0, CHUTE_Y, CHUTE_UP), 0.24, m["dark"], verts=24)
-    telescope.append((skirt, 1.0))
-    # winch cables
-    for x in (-0.3, 0.3):
-        cable = rig.cylinder(f"cable{x}", (x, CHUTE_Y, CHUTE_UP), (x, CHUTE_Y, PORTAL_Z + 0.2), 0.008, m["dark"], verts=6)
-        telescope.append((cable, 1.0))
 
-
-def elevator(m):
-    """Bucket elevator at the port lifting the goods to the top of the bin."""
+def elevator(p):
+    """Bucket elevator at the port lifting the goods to the bin roof."""
     rig.layer("base")
     x, y = 2.5, -0.35
-    footing("elev_foot", x, y, m, (0.62, 0.62))
-    rig.box("elev_boot", (x, y, 0.4), (0.6, 0.6, 0.6), m["accent"])
+    kit.footing(x, y, (0.7, 0.7), 0.16)
+    rig.box("elev_boot", (x, y, 0.45), (0.62, 0.62, 0.6), p["red"], bevel=0.02)
+    kit.rivets((x - 0.28, y - 0.32, 0.7), (x + 0.28, y - 0.32, 0.7), 6, (0, -1, 0))
     rig.mesh("elev_hopper", [
-        (x - 0.3, y - 0.3, 0.7), (x + 0.45, y - 0.3, 0.7), (x + 0.45, y + 0.3, 0.7), (x - 0.3, y + 0.3, 0.7),
-        (x - 0.2, y - 0.2, 0.5), (x + 0.45, y - 0.2, 0.5), (x + 0.45, y + 0.2, 0.5), (x - 0.2, y + 0.2, 0.5),
-    ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], m["yellow"], bevel=0.01)
+        (x - 0.3, y - 0.3, 0.75), (x + 0.45, y - 0.3, 0.75), (x + 0.45, y + 0.3, 0.75), (x - 0.3, y + 0.3, 0.75),
+        (x - 0.2, y - 0.2, 0.56), (x + 0.45, y - 0.2, 0.56), (x + 0.45, y + 0.2, 0.56), (x - 0.2, y + 0.2, 0.56),
+    ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], p["yellow"], bevel=0.01)
     for dx in (-0.12, 0.12):
-        rig.box(f"elev_casing{dx}", (x + dx, y, 2.6), (0.2, 0.36, 4.2), m["bin"])
+        rig.box(f"elev_leg{dx}", (x + dx, y, 2.75), (0.2, 0.38, 4.0), p["olive"], bevel=0.01)
     for k in range(9):
-        rig.box(f"elev_flange{k}", (x, y, 0.75 + k * 0.5), (0.5, 0.42, 0.04), m["steel"])
-    for k in range(16):
-        rig.cylinder(f"elev_rung{k}", (x + 0.3, y - 0.14, 0.4 + k * 0.28), (x + 0.3, y + 0.14, 0.4 + k * 0.28), 0.012, m["yellow"])
-    for dy in (-0.14, 0.14):
-        rig.cylinder(f"elev_ladder{dy}", (x + 0.3, y + dy, 0.2), (x + 0.3, y + dy, 4.7), 0.016, m["yellow"])
+        z = 0.85 + k * 0.48
+        rig.box(f"elev_flange{k}", (x, y, z), (0.52, 0.44, 0.04), p["steel"], bevel=0.005)
+        kit.rivets((x - 0.22, y - 0.225, z), (x + 0.22, y - 0.225, z), 4, (0, -1, 0))
+    rig.box("elev_door", (x - 0.12, y - 0.2, 1.3), (0.16, 0.02, 0.3), p["dark"], bevel=0.004)
+    kit.ladder((x + 0.32, y, 0.15), (x + 0.32, y, 4.75), cage=True)
     rig.layer("top")
-    # head with drive motor and exposed gear pair, spout into the bin roof
-    rig.box("elev_head", (x, y, 4.95), (0.62, 0.5, 0.5), m["accent"])
-    rig.mesh("elev_spout", [
-        (x - 0.3, y - 0.15, 5.0), (x - 0.3, y + 0.15, 5.0), (x - 0.3, y + 0.15, 4.8), (x - 0.3, y - 0.15, 4.8),
-        (0.95, BIN_Y - 0.12, 4.75), (0.95, BIN_Y + 0.12, 4.75), (0.95, BIN_Y + 0.12, 4.6), (0.95, BIN_Y - 0.12, 4.6),
-    ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], m["steel"], bevel=0.01)
-    rig.cylinder("elev_motor", (x + 0.3, y - 0.42, 5.0), (x + 0.3, y - 0.42, 5.32), 0.15, m["motor"], verts=20)
-    big = rig.gear("elev_gear_big", (x, y - 0.3, 4.95), 0.2, 0.04, 16, m["brass"], axis="y")
-    small = rig.gear("elev_gear_small", (x + 0.3, y - 0.3, 5.15), 0.1, 0.04, 8, m["brass"], axis="y")
+    rig.box("elev_head", (x, y, 5.0), (0.64, 0.52, 0.52), p["red"], bevel=0.02)
+    kit.rivets((x - 0.3, y - 0.27, 5.2), (x + 0.3, y - 0.27, 5.2), 6, (0, -1, 0))
+    kit.motor((x + 0.12, y - 0.48, 5.14), axis="x", length=0.34, radius=0.12)
+    big = rig.gear("elev_gear_big", (x - 0.12, y - 0.3, 4.98), 0.17, 0.04, 16, p["brass"], axis="y")
+    small = rig.gear("elev_gear_small", (x + 0.15, y - 0.3, 5.16), 0.09, 0.04, 9, p["brass"], axis="y")
     spinning.append((big, 2 * math.pi / 16))
-    spinning.append((small, -2 * math.pi / 8))
-    rig.box("elev_lamp", (x - 0.2, y - 0.26, 5.22), (0.06, 0.02, 0.06), m["lamp"], bevel=0)
+    spinning.append((small, -2 * math.pi / 9))
+    kit.pipe([(x - 0.32, y + 0.1, 5.0), (1.6, BIN_Y + 0.1, 4.95), (1.0, BIN_Y + 0.1, BIN_TOP + 0.08)], 0.09, p["steel"])
+    kit.lamp((x - 0.2, y - 0.27, 5.32), "amber")
 
 
 def build():
     rig.reset()
-    m = materials()
-    portal(m)
-    elevator(m)
-    bin_and_chute(m)
+    kit.reset()
+    p = kit.palette()
+    portal(p)
+    elevator(p)
+    bin_and_chute(p)
     rig.layer("base")
     rig.sun()
     rig.fill_light()
@@ -181,16 +162,33 @@ def build():
 def set_chute(extension):
     """0 = retracted, 1 = resting on the wagon."""
     drop = (CHUTE_UP - CHUTE_DOWN) * extension
-    for obj, frac in telescope:
-        base = obj.get("z0")
-        if base is None:
-            obj["z0"] = base = obj.location.z
-        obj.location.z = base - drop * frac
+    for obj, frac in bellows:
+        z0 = obj.get("z0")
+        if z0 is None:
+            obj["z0"] = z0 = obj.location.z
+        obj.location.z = z0 - drop * frac
 
 
 def spin(frame):
     for pivot, step in spinning:
         pivot.rotation_euler[2] = step * frame
+
+
+def render_variant(out, v):
+    d = os.path.join(out, f"v{v}")
+    orient = (v - 1) / 4
+    set_chute(0)
+    spin(0)
+    rig.render_frames(d, [0], lambda i: orient, passes=("base", "shadow", "top"), samples=32)
+    os.replace(os.path.join(d, "top_000.png"), os.path.join(d, "idle_000.png"))
+    rig.render_frames(d, list(range(EXTEND_FRAMES)), lambda i: orient, passes=("top",), samples=32,
+                      pose=lambda i: set_chute((i + 1) / EXTEND_FRAMES))
+    for i in range(EXTEND_FRAMES):
+        os.replace(os.path.join(d, f"top_{i:03d}.png"), os.path.join(d, f"extend_{i:03d}.png"))
+    rig.render_frames(d, list(range(ANIM_FRAMES)), lambda i: orient, passes=("top",), samples=32,
+                      pose=lambda i: (set_chute(1), spin(i)))
+    for i in range(ANIM_FRAMES):
+        os.replace(os.path.join(d, f"top_{i:03d}.png"), os.path.join(d, f"work_{i:03d}.png"))
 
 
 if __name__ == "__main__":
@@ -199,17 +197,4 @@ if __name__ == "__main__":
     variants = [int(x) for x in a[1:]] or [1, 2, 3, 4]
     build()
     for v in variants:
-        d = os.path.join(out, f"v{v}")
-        orient = (v - 1) / 4
-        set_chute(0)
-        spin(0)
-        rig.render_frames(d, [0], lambda i: orient, passes=("base", "shadow", "top"), samples=32)
-        os.replace(os.path.join(d, "top_000.png"), os.path.join(d, "idle_000.png"))
-        rig.render_frames(d, list(range(EXTEND_FRAMES)), lambda i: orient, passes=("top",), samples=32,
-                          pose=lambda i: set_chute((i + 1) / EXTEND_FRAMES))
-        for i in range(EXTEND_FRAMES):
-            os.replace(os.path.join(d, f"top_{i:03d}.png"), os.path.join(d, f"extend_{i:03d}.png"))
-        rig.render_frames(d, list(range(ANIM_FRAMES)), lambda i: orient, passes=("top",), samples=32,
-                          pose=lambda i: (set_chute(1), spin(i)))
-        for i in range(ANIM_FRAMES):
-            os.replace(os.path.join(d, f"top_{i:03d}.png"), os.path.join(d, f"work_{i:03d}.png"))
+        render_variant(out, v)

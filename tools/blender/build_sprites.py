@@ -89,9 +89,9 @@ def main(render_dir):
                          for kind in ("color", "mask", "shadow", "load")}
 
     for key, layers in (
-        ("b3", {"base": 1, "shadow": 1, "idle": 1, "top": 8}),
+        ("b3", {"base": 1, "shadow": 1, "idle": 1, "extend": 8, "work": 8}),
         ("b1", {"base": 1, "shadow": 1, "idle": 1, "extend": 8, "work": 8}),
-        ("e1", {"idle": 1, "work": 8}),
+        ("e1", {"idle": 1, "extend": 8, "work": 8}),
     ):
         for v in range(1, 5):
             src = os.path.join(render_dir, key, f"v{v}")
@@ -100,8 +100,7 @@ def main(render_dir):
             o = origin_of(src, G)
             entry = {}
             for kind, count in layers.items():
-                name = "work" if kind == "top" else kind
-                entry[name] = write_sheet(frames(src, kind, count, G), o, f"{key}-{v}-{name}", 8)
+                entry[kind] = write_sheet(frames(src, kind, count, G), o, f"{key}-{v}-{kind}", 8)
             meta[f"{key}-{v}"] = entry
 
     with open(os.path.join(OUT, "sprites.lua"), "w") as f:
