@@ -729,7 +729,11 @@ local function rescan()
       storage.wagons[wagon.unit_number] = wagon
     end
     for _, station in pairs(surface.find_entities_filtered({ name = names })) do
-      register_station(station, variant_of[station.name])
+      local info = variant_of[station.name]
+      local record = register_station(station, info) or storage.stations[station.unit_number]
+      -- stations from 0.1.0: the belt loader gains its control box, all gain the signal combinator
+      if record and not (record.store and record.store.valid) then record.store = create_store(station, info) end
+      if record then circuit.attach(record) end
     end
   end
 end
