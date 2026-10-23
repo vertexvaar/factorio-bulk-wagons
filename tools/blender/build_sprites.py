@@ -108,5 +108,35 @@ def main(render_dir):
     print("wrote", len(meta), "sprite sets")
 
 
+
+
+
+def icons(render_dir, out_dir):
+    """64 px item icons (plus 144 px thumbnail) cut from the renders."""
+    from PIL import Image
+    os.makedirs(out_dir, exist_ok=True)
+    G = pack.GROUND_STRETCH
+
+    def fit(img, size):
+        img = img.crop(img.getbbox())
+        scale = size / max(img.size)
+        img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+        canvas = Image.new("RGBA", (size, size))
+        canvas.alpha_composite(img, ((size - img.width) // 2, (size - img.height) // 2))
+        return canvas
+
+    w = os.path.join(render_dir, "w1")
+    wagon = pack.tinted(pack.load(w, "color", 40), pack.load(w, "mask", 40), (0.56, 0.23, 0.15))
+    fit(wagon, 64).save(os.path.join(out_dir, "bulk-wagon.png"))
+    for key, name in (("e1", "unloading-pit"), ("b3", "belt-loader"), ("b1", "loading-station")):
+        src = os.path.join(render_dir, key, "v1")
+        layers = [pack.load(src, kind, 0, G) for kind in ("base", "idle") if os.path.exists(os.path.join(src, f"{kind}_000.png"))]
+        img = layers[0].copy()
+        for extra in layers[1:]:
+            img.alpha_composite(extra)
+        fit(img, 64).save(os.path.join(out_dir, f"{name}.png"))
+
+
 if __name__ == "__main__":
     main(sys.argv[1])
+    icons(sys.argv[1], os.path.join(ROOT, "graphics", "icons"))

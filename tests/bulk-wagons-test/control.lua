@@ -122,6 +122,12 @@ local function setup()
   station_inv.insert({ name = "coal", count = 200 })
   station_inv.insert({ name = "iron-plate", count = 5 })
   s.in_belts = belt_run(surface, { 30.5, -13.5 }, { -1, 0 }, 7, defines.direction.west)
+  -- circuit wire from the station's inventory to a constant combinator
+  s.store_b = surface.find_entities_filtered({ name = "bulk-loading-station-store-v", position = { 21, -13 } })[1]
+  s.combinator = surface.create_entity({ name = "constant-combinator", position = { 25.5, -10.5 }, force = "player" })
+  local connected = s.store_b and s.store_b.get_wire_connector(defines.wire_connector_id.circuit_red, true)
+    .connect_to(s.combinator.get_wire_connector(defines.wire_connector_id.circuit_red, true))
+  report(connected == true, "circuit wire connects to station inventory")
 
   -- Scene C: horizontal track y=31, pit variant 2 (port south).
   rail_line(surface, false, 31, -41, 41)
@@ -201,6 +207,8 @@ local function check()
   report(count(wagon_b, "coal") == 200, "loading station filled wagon", count(wagon_b, "coal") .. " coal")
   report(count(wagon_b, "copper-ore") > 0, "belt feeds wagon through loading port", count(wagon_b, "copper-ore") .. " copper")
   report(count(wagon_b, "iron-plate") == 0 and count(station, "iron-plate") == 5, "loading station keeps forbidden items")
+  local read = s.store_b.get_signal({ type = "item", name = "iron-plate" }, defines.wire_connector_id.circuit_red)
+  report(read == 5, "circuit network reads station contents", tostring(read))
 
   local wagon_f = s.wagon_f.get_inventory(defines.inventory.cargo_wagon)
   s.f_count = count(wagon_f, "copper-ore")

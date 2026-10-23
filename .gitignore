@@ -2,3 +2,4 @@ tests/.env/
 *.zip
 __pycache__/
 tools/blender/out/
+dist/

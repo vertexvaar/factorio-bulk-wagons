@@ -7,7 +7,7 @@ local slots = settings.startup["bulk-wagons-wagon-slots"].value
 -- until the final sprites exist.
 local wagon = table.deepcopy(data.raw["cargo-wagon"]["cargo-wagon"])
 wagon.name = shared.wagon
-wagon.icons = { { icon = "__base__/graphics/icons/cargo-wagon.png", tint = { r = 1, g = 0.75, b = 0.6 } } }
+wagon.icons = { { icon = "__bulk-wagons__/graphics/icons/bulk-wagon.png", icon_size = 64 } }
 wagon.icon = nil
 wagon.inventory_size = slots
 wagon.minable = { mining_time = 0.5, result = shared.wagon }

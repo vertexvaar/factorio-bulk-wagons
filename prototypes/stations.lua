@@ -127,7 +127,7 @@ end
 
 data:extend(station_variants({
   name = shared.pit,
-  icon = gfx .. "unloading-pit-icon.png",
+  icon = "__bulk-wagons__/graphics/icons/unloading-pit.png",
   sprite = "e1",
   placeholder = "unloading-pit",
   -- over ballast and sleepers, under the rail metal
@@ -146,7 +146,7 @@ data:extend(station_variants({
 -- Tier 1 loader: no inventory, the belt feeds the wagon directly.
 data:extend(station_variants({
   name = shared.belt_loader,
-  icon = gfx .. "belt-loader-icon.png",
+  icon = "__bulk-wagons__/graphics/icons/belt-loader.png",
   sprite = "b3",
   placeholder = "belt-loader",
   render_layer = "lower-object-above-shadow",
@@ -161,7 +161,7 @@ data:extend(station_variants({
 -- Tier 2 loader: portal silo with an inventory.
 data:extend(station_variants({
   name = shared.loader,
-  icon = gfx .. "loading-station-icon.png",
+  icon = "__bulk-wagons__/graphics/icons/loading-station.png",
   sprite = "b1",
   placeholder = "loading-station",
   render_layer = "lower-object-above-shadow",

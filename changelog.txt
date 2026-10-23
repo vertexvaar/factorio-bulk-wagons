@@ -2,7 +2,12 @@
 Version: 0.1.0
 Date: 2026-10-23
   Features:
-    - Bulk wagon that only carries ores and other bulk goods.
-    - Unloading pit and loading station built across the track, each with a built-in belt port and an inventory for inserters.
-    - Stations turn and centre themselves on the rail when built; R rotates the belt port side while placing.
-    - Startup settings for wagon slots, station sizes and port belt speed; runtime settings for transfer rate and extra bulk items.
+    - Bulk wagon: hopper wagon with three compartments that only carries ores and other bulk goods. Load is shown in the colour of the cargo. Colourable like a locomotive.
+    - Belt loader (first research): no inventory, loads stopped bulk wagons straight from the connected belt at that belt's speed.
+    - Portal silo loading station (second research): buffer inventory, filled by its built-in belt port or inserters.
+    - Unloading pit with walkable gratings: empties stopped bulk wagons into its inventory, emptied by its built-in belt port or inserters.
+    - All stations are built across the track, three per wagon, and turn and centre themselves on the rail. R switches the belt port side while placing.
+    - Docking animations: spouts lower onto the wagon, flap openers rise at the pit.
+    - Station inventories can be read by the circuit network.
+    - Every Space Age planet gets its own variant of wagon and stations (placeholder tint for now).
+    - Startup settings for wagon slots, station sizes and port belt speed; map settings for transfer rate and extra bulk items.
