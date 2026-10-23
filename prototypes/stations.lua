@@ -12,54 +12,61 @@ local walkable_mask = { layers = { is_object = true, transport_belt = true } }
 
 local function station_variants(def)
   local prototypes = {}
-  for variant = 1, shared.variant_count do
-    local name = shared.variant_name(def.name, variant)
-    local vertical = shared.rail_is_vertical(variant)
-    local half_w, half_h = 3, 1
-    if not vertical then half_w, half_h = 1, 3 end
+  for _, planet in pairs(shared.active_planets(mods)) do
+    for variant = 1, shared.variant_count do
+      local name = shared.variant_name(def.name, variant, planet)
+      local vertical = shared.rail_is_vertical(variant)
+      local half_w, half_h = 3, 1
+      if not vertical then
+        half_w, half_h = 1, 3
+      end
 
-    local entity = {
-      type = def.inventory and "container" or "simple-entity-with-owner",
-      name = name,
-      icon = def.icon,
-      flags = { "placeable-neutral", "player-creation" },
-      hidden_in_factoriopedia = variant ~= 1,
-      placeable_by = { item = def.name, count = 1 },
-      minable = { mining_time = 0.5, result = def.name },
-      max_health = 500,
-      corpse = "medium-remnants",
-      dying_explosion = "medium-explosion",
-      open_sound = sounds.metallic_chest_open,
-      close_sound = sounds.metallic_chest_close,
-      collision_box = { { -half_w + 0.1, -half_h + 0.1 }, { half_w - 0.1, half_h - 0.1 } },
-      selection_box = { { -half_w, -half_h }, { half_w, half_h } },
-      collision_mask = def.walkable and walkable_mask or station_mask,
-      picture = {
-        filename = gfx .. def.sprite .. "-" .. variant .. ".png",
-        width = vertical and 384 or 128,
-        height = vertical and 128 or 384,
-        scale = 0.5,
-      },
-    }
-    if def.inventory then
-      entity.inventory_size = math.max(1, math.floor(wagon_slots * def.inventory + 0.5))
-      entity.inventory_type = "with_filters_and_bar"
-      entity.circuit_wire_max_distance = 9
-    end
-    prototypes[#prototypes + 1] = entity
-
-    if variant ~= 1 then
-      prototypes[#prototypes + 1] = {
-        type = "item",
+      local entity = {
+        type = def.inventory and "container" or "simple-entity-with-owner",
         name = name,
         icon = def.icon,
-        hidden = true,
-        subgroup = "train-transport",
-        order = def.order .. "-" .. variant,
-        place_result = name,
-        stack_size = 10,
+        flags = { "placeable-neutral", "player-creation" },
+        hidden_in_factoriopedia = variant ~= 1 or planet ~= shared.default_planet,
+        placeable_by = { item = def.name, count = 1 },
+        minable = { mining_time = 0.5, result = def.name },
+        max_health = 500,
+        corpse = "medium-remnants",
+        dying_explosion = "medium-explosion",
+        open_sound = sounds.metallic_chest_open,
+        close_sound = sounds.metallic_chest_close,
+        collision_box = { { -half_w + 0.1, -half_h + 0.1 }, { half_w - 0.1, half_h - 0.1 } },
+        selection_box = { { -half_w, -half_h }, { half_w, half_h } },
+        collision_mask = def.walkable and walkable_mask or station_mask,
+        picture = {
+          filename = gfx .. def.sprite .. "-" .. variant .. ".png",
+          width = vertical and 384 or 128,
+          height = vertical and 128 or 384,
+          scale = 0.5,
+          tint = shared.placeholder_tint[planet],
+        },
       }
+      if def.inventory then
+        entity.inventory_size = math.max(1, math.floor(wagon_slots * def.inventory + 0.5))
+        entity.inventory_type = "with_filters_and_bar"
+        entity.circuit_wire_max_distance = 9
+      end
+      prototypes[#prototypes + 1] = entity
     end
+  end
+
+  for variant = 2, shared.variant_count do
+    local name = shared.variant_name(def.name, variant)
+    -- Rotated variants exist as items only so they can sit in the cursor.
+    prototypes[#prototypes + 1] = {
+      type = "item",
+      name = name,
+      icon = def.icon,
+      hidden = true,
+      subgroup = "train-transport",
+      order = def.order .. "-" .. variant,
+      place_result = name,
+      stack_size = 10,
+    }
   end
 
   prototypes[#prototypes + 1] = {
@@ -130,7 +137,14 @@ local function make_port(name, speed, container_distance, rail_interaction)
   local port = table.deepcopy(data.raw["loader-1x1"]["loader-1x1"])
   port.name = name
   port.hidden = true
-  port.flags = { "not-blueprintable", "not-deconstructable", "not-on-map", "placeable-off-grid", "no-copy-paste", "not-upgradable" }
+  port.flags = {
+    "not-blueprintable",
+    "not-deconstructable",
+    "not-on-map",
+    "placeable-off-grid",
+    "no-copy-paste",
+    "not-upgradable",
+  }
   port.selectable_in_game = false
   port.minable = nil
   port.collision_mask = { layers = { transport_belt = true } }

@@ -21,6 +21,19 @@ item.icon = nil
 item.place_result = shared.wagon
 item.order = "c[rolling-stock]-b[cargo-wagon]-b[bulk-wagon]"
 
+-- Planet variants: same item, own look. The script swaps a wagon to the
+-- variant of the planet it is placed on.
+for _, planet in pairs(shared.active_planets(mods)) do
+  if planet ~= shared.default_planet then
+    local variant = table.deepcopy(wagon)
+    variant.name = shared.wagon_name(planet)
+    variant.placeable_by = { item = shared.wagon, count = 1 }
+    variant.hidden_in_factoriopedia = true
+    variant.pictures.rotated.layers[1].tint = shared.placeholder_tint[planet]
+    data:extend({ variant })
+  end
+end
+
 data:extend({
   wagon,
   item,

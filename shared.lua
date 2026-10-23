@@ -13,9 +13,39 @@ shared.rail_port = "bulk-rail-port"
 -- 3 = rail north-south, port west; 4 = rail east-west, port north.
 shared.variant_count = 4
 
-function shared.variant_name(base, variant)
-  if variant == 1 then return base end
-  return base .. "-" .. variant
+-- Every planet gets its own look. Nauvis (and any planet this mod does not
+-- know) uses the plain names; the others append the planet name.
+shared.planets = { "nauvis", "vulcanus", "fulgora", "gleba", "aquilo" }
+shared.default_planet = "nauvis"
+
+local function with_planet(base, planet)
+  if planet and planet ~= shared.default_planet then return base .. "-" .. planet end
+  return base
+end
+
+function shared.variant_name(base, variant, planet)
+  local name = with_planet(base, planet)
+  if variant == 1 then return name end
+  return name .. "-" .. variant
+end
+
+-- Planets that get their own variants; without Space Age only Nauvis.
+function shared.active_planets(active_mods)
+  if active_mods["space-age"] then return shared.planets end
+  return { shared.default_planet }
+end
+
+-- Placeholder tints that tell the planet variants apart until real art exists.
+shared.placeholder_tint = {
+  nauvis = { 1, 1, 1 },
+  vulcanus = { 1, 0.6, 0.4 },
+  fulgora = { 0.85, 0.7, 1 },
+  gleba = { 0.7, 1, 0.6 },
+  aquilo = { 0.7, 0.9, 1 },
+}
+
+function shared.wagon_name(planet)
+  return with_planet(shared.wagon, planet)
 end
 
 -- Rotates a vector clockwise by (variant - 1) quarter turns.

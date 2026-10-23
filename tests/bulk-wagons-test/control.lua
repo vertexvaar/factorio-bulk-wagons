@@ -40,6 +40,12 @@ local function train(surface, vertical, fixed, loco_at, wagon_at)
     name = "bulk-wagon", force = "player", direction = dir, raise_built = true,
     position = vertical and { fixed, wagon_at } or { wagon_at, fixed },
   })
+  if not (wagon and wagon.valid) then
+    -- the mod swapped it for the planet variant
+    local at = vertical and { fixed, wagon_at } or { wagon_at, fixed }
+    wagon = surface.find_entities_filtered({ type = "cargo-wagon", position = at, radius = 3 })[1]
+    log("BULKDEBUG swapped wagon found: " .. tostring(wagon and wagon.name))
+  end
   loco.train.manual_mode = true
   return wagon
 end
@@ -53,6 +59,33 @@ local function belt_run(surface, start, step, n, direction)
     })
   end
   return belts
+end
+
+local function prepare(surface)
+  local area = { { -64, -64 }, { 64, 64 } }
+  for _, e in pairs(surface.find_entities_filtered({ area = area })) do
+    if e.type ~= "character" then e.destroy() end
+  end
+  local tiles = {}
+  for x = -64, 63 do
+    for y = -64, 63 do tiles[#tiles + 1] = { name = "lab-dark-1", position = { x, y } } end
+  end
+  surface.set_tiles(tiles)
+end
+
+local function setup_vulcanus(s)
+  local surface = game.planets.vulcanus.create_surface()
+  surface.request_to_generate_chunks({ 0, 0 }, 3)
+  surface.force_generate_chunk_requests()
+  prepare(surface)
+  rail_line(surface, true, 1, -41, 41)
+  s.wagon_v = train(surface, true, 1, -20, -13)
+  s.pit_v = surface.create_entity({ name = "bulk-unloading-pit", position = { 1, -13 }, force = "player", raise_built = true })
+  if not (s.pit_v and s.pit_v.valid) then s.pit_v = surface.find_entities_filtered({ type = "container", position = { 1, -13 } })[1] end
+  report(s.wagon_v.name == "bulk-wagon-vulcanus", "wagon becomes Vulcanus variant", s.wagon_v.name)
+  report(s.pit_v.name == "bulk-unloading-pit-vulcanus", "pit becomes Vulcanus variant", s.pit_v.name)
+  report(#s.wagon_v.train.carriages == 2, "swapped wagon stays coupled", #s.wagon_v.train.carriages .. " carriages")
+  s.wagon_v.get_inventory(defines.inventory.cargo_wagon).insert({ name = "tungsten-ore", count = 50 })
 end
 
 local function setup()
@@ -117,6 +150,8 @@ local function setup()
   local ports = surface.find_entities_filtered({ name = "bulk-station-port", area = { { 4, 28 }, { 10, 36 } } })
   report(#ports == 1 and ports[1].loader_container == s.aligned, "aligned station has its port", #ports .. " ports")
 
+  if game.planets.vulcanus then setup_vulcanus(s) end
+
   storage.scene = s
   storage.start = game.tick
   report(s.pit and s.pit.valid, "pit built across rail")
@@ -169,6 +204,11 @@ local function check()
   s.f_count = count(wagon_f, "copper-ore")
   report(s.f_count > 0, "belt loader feeds wagon directly", s.f_count .. " copper")
   report(s.belt_loader.get_inventory == nil or s.belt_loader.get_inventory(defines.inventory.chest) == nil, "belt loader has no inventory")
+
+  if s.wagon_v then
+    local wagon_v = s.wagon_v.get_inventory(defines.inventory.cargo_wagon)
+    report(count(wagon_v, "tungsten-ore") == 0, "Vulcanus pit unloads", count(wagon_v, "tungsten-ore") .. " left")
+  end
 
   local wagon_c = s.wagon_c.get_inventory(defines.inventory.cargo_wagon)
   report(count(wagon_c, "stone") == 0, "horizontal pit unloads", count(wagon_c, "stone") .. " left")

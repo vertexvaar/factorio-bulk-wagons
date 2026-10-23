@@ -4,7 +4,7 @@ Creates an isolated Factorio environment (own config, write dir and mod dir)
 under tests/.env, creates a map with the test harness mod and runs it through
 --benchmark. Prints all BULKTEST lines and exits non-zero on failure.
 
-Usage: python tests/run.py [path-to-factorio.exe]
+Usage: python tests/run.py [--no-space-age] [path-to-factorio.exe]
 """
 import json
 import os
@@ -19,7 +19,7 @@ MOD_FILES = ["info.json", "data.lua", "control.lua", "settings.lua", "shared.lua
 MOD_DIRS = ["prototypes", "graphics", "locale"]
 
 
-def prepare():
+def prepare(space_age):
     shutil.rmtree(ENV, ignore_errors=True)
     mods = os.path.join(ENV, "mods")
     target = os.path.join(mods, "bulk-wagons")
@@ -32,7 +32,7 @@ def prepare():
     shutil.copytree(os.path.join(ROOT, "tests", "bulk-wagons-test"), os.path.join(mods, "bulk-wagons-test"))
     names = ["base", "elevated-rails", "quality", "space-age", "bulk-wagons", "bulk-wagons-test"]
     with open(os.path.join(mods, "mod-list.json"), "w") as f:
-        json.dump({"mods": [{"name": n, "enabled": True} for n in names]}, f)
+        json.dump({"mods": [{"name": n, "enabled": space_age or n == "base" or n.startswith("bulk")} for n in names]}, f)
     write = os.path.join(ENV, "write")
     os.makedirs(os.path.join(ENV, "config"))
     with open(os.path.join(ENV, "config", "config.ini"), "w") as f:
@@ -48,8 +48,11 @@ def run(exe, *args):
 
 
 def main():
-    exe = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_EXE
-    prepare()
+    args = sys.argv[1:]
+    space_age = "--no-space-age" not in args
+    args = [a for a in args if a != "--no-space-age"]
+    exe = args[0] if args else DEFAULT_EXE
+    prepare(space_age)
     save = os.path.join(ENV, "test.zip")
     created = run(exe, "--create", save)
     if created.returncode != 0 or not os.path.exists(save):
@@ -59,6 +62,8 @@ def main():
     log_path = os.path.join(ENV, "write", "factorio-current.log")
     log = open(log_path, encoding="utf-8", errors="replace").read() if os.path.exists(log_path) else bench.stdout
     lines = [l for l in log.splitlines() if "BULKTEST" in l or "Error" in l]
+    if "Error" in bench.stdout:
+        lines.append(bench.stdout[bench.stdout.index("Error"):][:3000])
     print("\n".join(lines) if lines else log[-4000:])
     if not any("BULKTEST DONE" in l for l in lines) or any("BULKTEST FAIL" in l for l in lines):
         sys.exit(1)

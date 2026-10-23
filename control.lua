@@ -11,12 +11,36 @@ local EXTRA_BULK_ITEMS = {
   "tree-seed", "jellynut-seed", "yumako-seed",
 }
 
--- entity/item name -> { base = station base name, variant = 1..4 }
+local planet_set = {}
+for _, planet in pairs(shared.planets) do planet_set[planet] = true end
+
+-- entity/item name -> { base = station base name, variant = 1..4, planet = name }.
+-- Planet variants only exist with Space Age; exists() tells which are defined.
 local variant_of = {}
-for _, base in pairs({ shared.pit, shared.loader, shared.belt_loader }) do
-  for variant = 1, shared.variant_count do
-    variant_of[shared.variant_name(base, variant)] = { base = base, variant = variant }
+-- entity name -> planet, for every bulk wagon prototype name
+local wagon_planet = {}
+for _, planet in pairs(shared.planets) do
+  for _, base in pairs({ shared.pit, shared.loader, shared.belt_loader }) do
+    for variant = 1, shared.variant_count do
+      variant_of[shared.variant_name(base, variant, planet)] = { base = base, variant = variant, planet = planet }
+    end
   end
+  wagon_planet[shared.wagon_name(planet)] = planet
+end
+local wagon_names = {} -- defined wagon prototypes, filled on init/load
+
+local function exists(name)
+  return prototypes.entity[name] ~= nil
+end
+
+local function is_wagon(entity)
+  return wagon_planet[entity.name] ~= nil
+end
+
+local function planet_of(surface)
+  local planet = surface.planet and surface.planet.name
+  if planet_set[planet] then return planet end
+  return shared.default_planet
 end
 
 local function init_storage()
@@ -164,32 +188,54 @@ local function straight_rail_in(surface, area)
   end
 end
 
--- A station built by hand across a rail turns and centres itself on that rail.
-local function align_to_rail(entity, info)
-  local rail, vertical = straight_rail_in(entity.surface, entity.bounding_box)
-  if not rail then return entity end
-
-  local variant = info.variant
-  if vertical ~= shared.rail_is_vertical(variant) then variant = variant % shared.variant_count + 1 end
-  local position = vertical and { rail.position.x, entity.position.y } or { entity.position.x, rail.position.y }
-  if variant == info.variant and position[1] == entity.position.x and position[2] == entity.position.y then
-    return entity
-  end
-
+-- Replaces a freshly built entity by another prototype. Returns the new entity,
+-- or the original one again if the replacement does not fit.
+local function replace(entity, params)
   local surface = entity.surface
-  local params = {
-    name = shared.variant_name(info.base, variant),
-    position = position,
-    force = entity.force,
-    quality = entity.quality,
-    create_build_effect_smoke = false,
+  local original = {
+    name = entity.name, position = entity.position, direction = params.direction,
+    force = entity.force, quality = entity.quality, color = params.color,
   }
-  local original = { name = entity.name, position = entity.position, force = entity.force, quality = entity.quality }
+  params.force, params.quality, params.create_build_effect_smoke = entity.force, entity.quality, false
   entity.destroy()
   if surface.can_place_entity(params) then
-    return surface.create_entity(params)
+    local created = surface.create_entity(params)
+    if created then return created end
   end
+  log("bulk-wagons: could not swap " .. original.name .. " for " .. params.name)
   return surface.create_entity(original)
+end
+
+-- Picks the station variant for the planet it stands on. A station built by
+-- hand (align) also turns and centres itself on the rail below it.
+local function fit_station(entity, info, align)
+  local variant = info.variant
+  local position = { entity.position.x, entity.position.y }
+  if align then
+    local rail, vertical = straight_rail_in(entity.surface, entity.bounding_box)
+    if rail then
+      if vertical ~= shared.rail_is_vertical(variant) then variant = variant % shared.variant_count + 1 end
+      if vertical then position[1] = rail.position.x else position[2] = rail.position.y end
+    end
+  end
+  local name = shared.variant_name(info.base, variant, planet_of(entity.surface))
+  if not exists(name) then name = shared.variant_name(info.base, variant) end
+  if name == entity.name and position[1] == entity.position.x and position[2] == entity.position.y then
+    return entity
+  end
+  return replace(entity, { name = name, position = position })
+end
+
+-- Swaps a wagon to the variant of the planet it is placed on.
+local function fit_wagon(entity)
+  local name = shared.wagon_name(planet_of(entity.surface))
+  if name == entity.name or not exists(name) then return entity end
+  return replace(entity, {
+    name = name,
+    position = entity.position,
+    direction = math.floor(entity.orientation * 16 + 0.5) % 16,
+    color = entity.color,
+  })
 end
 
 local function find_wagon(record)
@@ -198,7 +244,7 @@ local function find_wagon(record)
   local vertical = shared.rail_is_vertical(record.variant)
   local area = vertical and { { p.x - 0.5, p.y - 3 }, { p.x + 0.5, p.y + 3 } }
     or { { p.x - 3, p.y - 0.5 }, { p.x + 3, p.y + 0.5 } }
-  for _, wagon in pairs(station.surface.find_entities_filtered({ name = shared.wagon, area = area })) do
+  for _, wagon in pairs(station.surface.find_entities_filtered({ name = wagon_names, area = area })) do
     local wp = wagon.position
     local along = vertical and math.abs(wp.y - p.y) or math.abs(wp.x - p.x)
     local across = vertical and math.abs(wp.x - p.x) or math.abs(wp.y - p.y)
@@ -256,14 +302,16 @@ local function on_built(event)
     if event.destination then entity.destroy() end
     return
   end
-  if entity.name == shared.wagon then
-    storage.wagons[entity.unit_number] = entity
+  local cloned = event.destination ~= nil
+  if is_wagon(entity) then
+    if not cloned then entity = fit_wagon(entity) end
+    if entity and entity.valid then storage.wagons[entity.unit_number] = entity end
     return
   end
   local info = variant_of[entity.name]
   if not info then return end
-  if event.name == defines.events.on_built_entity then
-    entity = align_to_rail(entity, info)
+  if not cloned then
+    entity = fit_station(entity, info, event.name == defines.events.on_built_entity)
     if not (entity and entity.valid) then return end
     info = variant_of[entity.name]
   end
@@ -273,7 +321,7 @@ end
 local function on_removed(event)
   local entity = event.entity
   if not (entity and entity.valid) then return end
-  if entity.name == shared.wagon then
+  if is_wagon(entity) then
     storage.wagons[entity.unit_number] = nil
   elseif variant_of[entity.name] then
     remove_station(entity.unit_number, event.buffer)
@@ -321,7 +369,7 @@ local function normalize_inventory(event)
   normalizing = true
   for _, item in pairs(inventory.get_contents()) do
     local info = variant_of[item.name]
-    if info and info.variant ~= 1 then
+    if info and (info.variant ~= 1 or info.planet ~= shared.default_planet) then
       local removed = inventory.remove({ name = item.name, count = item.count, quality = item.quality })
       local inserted = inventory.insert({ name = info.base, count = removed, quality = item.quality })
       if inserted < removed then
@@ -340,7 +388,7 @@ end
 
 local function on_gui_opened(event)
   local entity = event.entity
-  if entity and entity.valid and entity.name == shared.wagon then
+  if entity and entity.valid and is_wagon(entity) then
     storage.open_wagons[event.player_index] = entity
   end
 end
@@ -348,14 +396,14 @@ end
 local function on_gui_closed(event)
   local entity = event.entity
   storage.open_wagons[event.player_index] = nil
-  if entity and entity.valid and entity.name == shared.wagon then
+  if entity and entity.valid and is_wagon(entity) then
     purge_wagon(entity, game.get_player(event.player_index))
   end
 end
 
 local function on_fast_transferred(event)
   local entity = event.entity
-  if event.from_player and entity and entity.valid and entity.name == shared.wagon then
+  if event.from_player and entity and entity.valid and is_wagon(entity) then
     purge_wagon(entity, game.get_player(event.player_index))
   end
 end
@@ -383,13 +431,21 @@ end
 --------------------------------------------------------------------------------
 -- Setup
 
+local function collect_wagon_names()
+  for name in pairs(wagon_planet) do
+    if exists(name) then wagon_names[#wagon_names + 1] = name end
+  end
+end
+
 local function rescan()
+  local names = {}
+  for name in pairs(variant_of) do
+    if exists(name) then names[#names + 1] = name end
+  end
   for _, surface in pairs(game.surfaces) do
-    for _, wagon in pairs(surface.find_entities_filtered({ name = shared.wagon })) do
+    for _, wagon in pairs(surface.find_entities_filtered({ name = wagon_names })) do
       storage.wagons[wagon.unit_number] = wagon
     end
-    local names = {}
-    for name in pairs(variant_of) do names[#names + 1] = name end
     for _, station in pairs(surface.find_entities_filtered({ name = names })) do
       register_station(station, variant_of[station.name])
     end
@@ -397,9 +453,12 @@ local function rescan()
 end
 
 script.on_init(function()
+  collect_wagon_names()
   init_storage()
   build_allowed()
 end)
+
+script.on_load(collect_wagon_names)
 
 script.on_configuration_changed(function()
   init_storage()
@@ -456,7 +515,7 @@ remote.add_interface("bulk-wagons", {
   align_station = function(entity)
     local info = entity and entity.valid and variant_of[entity.name]
     if not info then return entity end
-    entity = align_to_rail(entity, info)
+    entity = fit_station(entity, info, true)
     if entity and entity.valid then register_station(entity, variant_of[entity.name]) end
     return entity
   end,
