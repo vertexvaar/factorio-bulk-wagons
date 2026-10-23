@@ -1,0 +1,9 @@
+{
+  "name": "bulk-wagons-test",
+  "version": "0.0.1",
+  "title": "Bulk Wagons test harness",
+  "author": "vertexvaar",
+  "factorio_version": "2.0",
+  "description": "Builds a test scene and logs BULKTEST results. Development only.",
+  "dependencies": ["bulk-wagons"]
+}

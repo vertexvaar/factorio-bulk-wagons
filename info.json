@@ -1,0 +1,10 @@
+{
+  "name": "bulk-wagons",
+  "version": "0.1.0",
+  "title": "Bulk Wagons",
+  "author": "vertexvaar",
+  "homepage": "https://github.com/vertexvaar/factorio-bulk-wagons",
+  "factorio_version": "2.0",
+  "description": "Bulk wagons for ores and other bulk goods, with a loading station and an unloading pit that are built across the track. Items move by built-in belt or inserter.",
+  "dependencies": ["base >= 2.0.0", "? space-age"]
+}
