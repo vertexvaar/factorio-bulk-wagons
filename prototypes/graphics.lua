@@ -78,6 +78,20 @@ function graphics.station_overlays()
   if #prototypes > 0 then data:extend(prototypes) end
 end
 
+-- Cargo heaps, drawn by the script on loaded wagons; one frame per direction.
+function graphics.wagon_load()
+  local set = sprites.wagon
+  if not (set and set.load) then return end
+  data:extend({
+    {
+      type = "animation",
+      name = "bulk-wagon-load",
+      layers = { sheet(set.load, { frame_count = 128 }) },
+    },
+    { type = "mod-data", name = "bulk-wagons-graphics", data = { load = true } },
+  })
+end
+
 function graphics.wagon_pictures(planet)
   local set = sprites.wagon
   if not set then return nil end

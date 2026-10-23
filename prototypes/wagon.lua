@@ -14,6 +14,7 @@ wagon.minable = { mining_time = 0.5, result = shared.wagon }
 wagon.color = { r = 0.56, g = 0.23, b = 0.15, a = 1 }
 wagon.allow_manual_color = true
 wagon.factoriopedia_simulation = nil
+graphics.wagon_load()
 if graphics.wagon_pictures() then
   wagon.pictures = graphics.wagon_pictures()
   -- an open hopper has no side doors

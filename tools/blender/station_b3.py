@@ -192,7 +192,7 @@ def build():
     rig.layer("base")
     rig.sun()
     rig.fill_light()
-    rig.camera(8, 8, shift_y=1.4)
+    rig.camera(9, 10, shift_y=1.8)
 
 
 def pose(frame):

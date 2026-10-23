@@ -37,6 +37,7 @@ def materials(planet="nauvis"):
         "rail": rig.material("rail", (0.72, 0.72, 0.70), roughness=0.3, metallic=0.85, grime=0.25),
         "rivet": rig.material("rivet", (0.30, 0.30, 0.31), roughness=0.3, metallic=0.8, grime=0.1),
         "dust": rig.material("dust", (0.16, 0.12, 0.09), roughness=1.0, grime=0.6, scale=12, bump=0.6),
+        "heap": rig.material("heap", (0.62, 0.62, 0.62), roughness=1.0, grime=0.5, scale=20, bump=1.0),
         "lamp": rig.material("lamp", (1.0, 0.7, 0.3), emission=(1.0, 0.55, 0.15)),
     }
 
@@ -194,15 +195,50 @@ def ends(m):
     rig.cylinder("brake_spindle", (0.5, -2.78, SILL), (0.5, -2.9, SILL + 0.4), 0.015, m["dark"])
 
 
+def cargo(m):
+    """Heaps of loose goods, one per compartment. Rendered as their own grey layer that the
+    game tints in the colour of the loaded ore and shows while the wagon is not empty."""
+    import bpy
+    rocks = bpy.data.textures.new("rocks", "VORONOI")
+    rocks.noise_scale = 0.07
+    lumps = bpy.data.textures.new("lumps", "CLOUDS")
+    lumps.noise_scale = 0.35
+    n = 28
+    hx, hy = HALF_W - 0.05, 0.6
+    for y0 in BAYS:
+        verts, faces = [], []
+        for j in range(n + 1):
+            for i in range(n + 1):
+                u, v = i / n * 2 - 1, j / n * 2 - 1
+                # mound: high in the middle, down to the walls
+                r = max(abs(u) ** 1.6, abs(v) ** 1.6)
+                z = BODY_TOP - 0.38 + 0.32 * (1 - r) ** 1.4
+                verts.append((u * hx, y0 + v * hy, z))
+        for j in range(n):
+            for i in range(n):
+                a = j * (n + 1) + i
+                faces.append((a, a + 1, a + n + 2, a + n + 1))
+        heap = rig.mesh(f"heap{y0}", verts, faces, m["heap"])
+        for tex, strength in ((lumps, 0.08), (rocks, 0.06)):
+            disp = heap.modifiers.new(tex.name, "DISPLACE")
+            disp.texture = tex
+            disp.strength = strength
+            disp.direction = "Z"
+        heap["load"] = True
+        for poly in heap.data.polygons:
+            poly.use_smooth = True
+
+
 def build(planet="nauvis"):
     rig.reset()
     m = materials(planet)
     hopper(m)
     underframe(m)
     ends(m)
+    cargo(m)
     rig.sun()
     rig.fill_light()
-    rig.camera(8, 8, shift_y=1.0)
+    rig.camera(8, 9, shift_y=1.3)
 
 
 if __name__ == "__main__":
@@ -210,4 +246,4 @@ if __name__ == "__main__":
     out = a[0]
     frames = [int(x) for x in a[1:]] or list(range(128))
     build()
-    rig.render_frames(out, frames, lambda i: i / 256, samples=32)
+    rig.render_frames(out, frames, lambda i: i / 256, passes=("color", "mask", "shadow", "load"), samples=32)

@@ -142,7 +142,7 @@ def build():
     extraction_belt(m)
     rig.sun()
     rig.fill_light()
-    rig.camera(8, 5, shift_y=0.3)
+    rig.camera(8, 8, shift_y=0.2)
 
 
 def pose(frame):

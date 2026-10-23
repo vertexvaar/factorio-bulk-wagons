@@ -59,6 +59,10 @@ local function init_storage()
   storage.open_wagons = storage.open_wagons or {} -- player_index -> wagon entity
   storage.remote_allowed = storage.remote_allowed or {}
   storage.store_owner = storage.store_owner or {} -- store unit_number -> station unit_number
+  storage.cargo = storage.cargo or {} -- wagon unit_number -> { wagon, render, frame, item }
+  -- the data stage reports which generated graphics exist
+  local info = prototypes.mod_data["bulk-wagons-graphics"]
+  storage.has_load_animation = info ~= nil and info.data.load == true
 end
 
 --------------------------------------------------------------------------------
@@ -565,10 +569,105 @@ local function check_open_wagons()
   end
 end
 
+--------------------------------------------------------------------------------
+-- Visible cargo: heaps in the wagon, tinted like the ore it carries
+
+local LOAD_ANIMATION = "bulk-wagon-load"
+local LOAD_FRAMES = 128 -- frame i shows orientation i / 256, back equals front
+local CARGO_COLORS = {
+  ["iron-ore"] = { 0.55, 0.62, 0.75 },
+  ["copper-ore"] = { 0.88, 0.5, 0.3 },
+  ["coal"] = { 0.22, 0.22, 0.22 },
+  ["stone"] = { 0.82, 0.72, 0.56 },
+  ["uranium-ore"] = { 0.5, 0.88, 0.35 },
+  ["uranium-238"] = { 0.4, 0.7, 0.35 },
+  ["uranium-235"] = { 0.3, 1.0, 0.3 },
+  ["calcite"] = { 0.93, 0.91, 0.86 },
+  ["tungsten-ore"] = { 0.38, 0.35, 0.45 },
+  ["scrap"] = { 0.62, 0.56, 0.5 },
+  ["ice"] = { 0.82, 0.92, 1.0 },
+  ["carbon"] = { 0.16, 0.16, 0.16 },
+  ["sulfur"] = { 0.95, 0.85, 0.3 },
+  ["holmium-ore"] = { 0.88, 0.55, 0.78 },
+  ["tree-seed"] = { 0.6, 0.5, 0.32 },
+  ["jellynut-seed"] = { 0.85, 0.45, 0.6 },
+  ["yumako-seed"] = { 0.85, 0.35, 0.3 },
+}
+local DEFAULT_CARGO_COLOR = { 0.6, 0.58, 0.55 }
+
+local function load_frame(wagon)
+  return math.floor(wagon.orientation * 2 * LOAD_FRAMES + 0.5) % LOAD_FRAMES
+end
+
+-- Shows, updates or removes the cargo heaps of one wagon.
+local function update_cargo(wagon)
+  if not storage.has_load_animation then return end
+  local unit = wagon.unit_number
+  local record = storage.cargo[unit]
+  local inventory = wagon.get_inventory(defines.inventory.cargo_wagon)
+  if inventory.is_empty() then
+    if record then
+      if record.render.valid then record.render.destroy() end
+      storage.cargo[unit] = nil
+    end
+    return
+  end
+  local top, most = nil, 0
+  for _, item in pairs(inventory.get_contents()) do
+    if item.count > most then top, most = item.name, item.count end
+  end
+  local color = CARGO_COLORS[top] or DEFAULT_CARGO_COLOR
+  local frame = load_frame(wagon)
+  if not (record and record.render.valid) then
+    record = {
+      wagon = wagon,
+      render = rendering.draw_animation({
+        animation = LOAD_ANIMATION,
+        surface = wagon.surface,
+        target = wagon,
+        render_layer = "cargo-hatch",
+        animation_speed = 0,
+        animation_offset = frame,
+        tint = color,
+      }),
+      frame = frame,
+      item = top,
+    }
+    storage.cargo[unit] = record
+    return
+  end
+  if record.frame ~= frame then
+    record.render.animation_offset = frame
+    record.frame = frame
+  end
+  if record.item ~= top then
+    record.render.color = color
+    record.item = top
+  end
+end
+
+-- Heaps of moving wagons follow the wagon's turning on curves.
+local function turn_cargo()
+  for unit, record in pairs(storage.cargo) do
+    local wagon = record.wagon
+    if not wagon.valid then
+      if record.render.valid then record.render.destroy() end
+      storage.cargo[unit] = nil
+    elseif wagon.train and wagon.train.speed ~= 0 then
+      local frame = load_frame(wagon)
+      if record.frame ~= frame then
+        record.render.animation_offset = frame
+        record.frame = frame
+      end
+    end
+  end
+end
+
 local function sweep_wagons()
   for unit_number, wagon in pairs(storage.wagons) do
     if wagon.valid then
       purge_wagon(wagon, nil)
+      update_cargo(wagon)
     else
       storage.wagons[unit_number] = nil
     end
@@ -652,6 +751,7 @@ script.on_event(defines.events.on_player_fast_transferred, on_fast_transferred)
 script.on_nth_tick(TRANSFER_PERIOD, transfer_pass)
 script.on_nth_tick(8, finish_transitions)
 script.on_nth_tick(SWEEP_PERIOD, sweep_wagons)
+script.on_nth_tick(2, turn_cargo)
 script.on_nth_tick(OPEN_GUI_PERIOD, check_open_wagons)
 
 remote.add_interface("bulk-wagons", {

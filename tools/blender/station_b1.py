@@ -175,7 +175,7 @@ def build():
     rig.layer("base")
     rig.sun()
     rig.fill_light()
-    rig.camera(8, 9, shift_y=2.2)
+    rig.camera(9, 11, shift_y=2.5)
 
 
 def set_chute(extension):

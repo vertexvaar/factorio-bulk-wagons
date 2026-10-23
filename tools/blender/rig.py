@@ -9,6 +9,7 @@ Passes per frame:
   mask   - white where the runtime tint (train colour) applies, else transparent
   shadow - only the shadow the object throws on the ground
 """
+import json
 import math
 import os
 import sys
@@ -31,6 +32,20 @@ def reset():
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
+    # use an NVIDIA card when there is one; much faster than the CPU
+    try:
+        prefs = bpy.context.preferences.addons["cycles"].preferences
+        for backend in ("OPTIX", "CUDA"):
+            prefs.compute_device_type = backend
+            prefs.get_devices()
+            gpus = [d for d in prefs.devices if d.type == backend]
+            if gpus:
+                for d in prefs.devices:
+                    d.use = d.type == backend
+                scene.cycles.device = "GPU"
+                break
+    except Exception as e:  # no GPU support in this build
+        print("GPU rendering unavailable:", e)
     scene.cycles.use_denoising = True
     scene.cycles.max_bounces = 4
     scene.render.film_transparent = True
@@ -64,6 +79,7 @@ def camera(width_tiles, height_tiles, supersample=2, shift_y=0.0):
     scene.render.resolution_y = round(height_tiles * TILE_PX * supersample)
     cam_data.shift_y = shift_y / height_tiles * (height_tiles / width_tiles)
     scene.render.resolution_percentage = 100
+    scene["framing"] = [width_tiles, height_tiles, shift_y]
     return cam
 
 
@@ -320,6 +336,17 @@ def _set_mask_mode(enabled, white, holdout):
                 obj.data.materials[i] = bpy.data.materials[name]
 
 
+def _set_load_mode(holdout):
+    """Only the cargo heaps render; the wagon still hides what is behind its walls."""
+    for obj in bpy.data.objects:
+        if obj.type != "MESH" or obj.name == "shadow_catcher" or obj.get("load"):
+            continue
+        if "orig_mats" not in obj:
+            obj["orig_mats"] = [m.name for m in obj.data.materials]
+        for i in range(len(obj.data.materials)):
+            obj.data.materials[i] = holdout
+
+
 def _mask_materials():
     white = bpy.data.materials.new("mask_white")
     white.use_nodes = True
@@ -359,6 +386,9 @@ def render_frames(out_dir, frames, orientation_of, passes=("color", "mask", "sha
     """
     os.makedirs(out_dir, exist_ok=True)
     scene = bpy.context.scene
+    # build_sprites.py needs the framing to place the entity origin
+    with open(os.path.join(out_dir, "camera.json"), "w") as f:
+        json.dump({"width": scene["framing"][0], "height": scene["framing"][1], "shift_y": scene["framing"][2]}, f)
     catcher = bpy.data.objects.get("shadow_catcher") or shadow_catcher()
     white, holdout = _mask_materials()
     meshes = [o for o in bpy.data.objects if o.type == "MESH" and o.name != "shadow_catcher"]
@@ -377,8 +407,13 @@ def render_frames(out_dir, frames, orientation_of, passes=("color", "mask", "sha
                     o.visible_camera = False
                 else:
                     o.visible_camera = True
+            for o in meshes:
+                if o.get("load"):
+                    o.hide_render = kind != "load"
             _set_mask_mode(kind == "mask", white, holdout)
-            scene.cycles.samples = {"mask": 4, "shadow": 16}.get(kind, samples)
+            if kind == "load":
+                _set_load_mode(holdout)
+            scene.cycles.samples = {"mask": 4, "shadow": 16, "load": 16}.get(kind, samples)
             scene.cycles.use_denoising = kind != "mask"
             scene.render.filepath = os.path.join(out_dir, f"{kind}_{i:03d}.png")
             bpy.ops.render.render(write_still=True)

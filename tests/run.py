@@ -19,7 +19,7 @@ MOD_FILES = ["info.json", "data.lua", "control.lua", "settings.lua", "shared.lua
 MOD_DIRS = ["prototypes", "graphics", "locale"]
 
 
-def prepare(space_age):
+def prepare(space_age, harness="bulk-wagons-test"):
     shutil.rmtree(ENV, ignore_errors=True)
     mods = os.path.join(ENV, "mods")
     target = os.path.join(mods, "bulk-wagons")
@@ -29,8 +29,8 @@ def prepare(space_age):
             shutil.copy(os.path.join(ROOT, f), target)
     for d in MOD_DIRS:
         shutil.copytree(os.path.join(ROOT, d), os.path.join(target, d))
-    shutil.copytree(os.path.join(ROOT, "tests", "bulk-wagons-test"), os.path.join(mods, "bulk-wagons-test"))
-    names = ["base", "elevated-rails", "quality", "space-age", "bulk-wagons", "bulk-wagons-test"]
+    shutil.copytree(os.path.join(ROOT, "tests", harness), os.path.join(mods, harness))
+    names = ["base", "elevated-rails", "quality", "space-age", "bulk-wagons", harness]
     with open(os.path.join(mods, "mod-list.json"), "w") as f:
         json.dump({"mods": [{"name": n, "enabled": space_age or n == "base" or n.startswith("bulk")} for n in names]}, f)
     write = os.path.join(ENV, "write")
@@ -44,7 +44,9 @@ def prepare(space_age):
 def run(exe, *args):
     cmd = [exe, "--config", os.path.join(ENV, "config", "config.ini"),
            "--mod-directory", os.path.join(ENV, "mods"), "--disable-audio", *args]
-    return subprocess.run(cmd, capture_output=True, text=True, errors="replace")
+    # Without these, the Steam build restarts itself through Steam when graphics are on.
+    env = dict(os.environ, SteamAppId="427520", SteamGameId="427520")
+    return subprocess.run(cmd, capture_output=True, text=True, errors="replace", env=env)
 
 
 def main():

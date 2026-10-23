@@ -13,8 +13,6 @@ import pack  # noqa: E402
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(ROOT, "graphics", "entity")
 
-# camera framing used by each render script: (width tiles, height tiles, shift_y tiles)
-CAMERAS = {"w1": (8, 8, 1.0), "b3": (8, 8, 1.4), "b1": (8, 9, 2.2), "e1": (8, 5, 0.3)}
 
 
 def frames(src, kind, count, stretch):
@@ -57,9 +55,12 @@ def write_sheet(images, origin, name, line_length, lines_per_file=None):
     }
 
 
-def origin_of(key, stretch):
-    w, h, shift = CAMERAS[key]
-    return (w * 64 / 2, (h / 2 + shift) * 64 * stretch)
+def origin_of(src, stretch):
+    """Pixel position of the world origin in a (final size) frame, from the render's camera.json."""
+    import json
+    with open(os.path.join(src, "camera.json")) as f:
+        cam = json.load(f)
+    return (cam["width"] * 64 / 2, (cam["height"] / 2 + cam["shift_y"]) * 64 * stretch)
 
 
 def lua(value, indent=""):
@@ -83,20 +84,20 @@ def main(render_dir):
 
     src = os.path.join(render_dir, "w1")
     if os.path.isdir(src):
-        o = origin_of("w1", 1.0)
+        o = origin_of(src, 1.0)
         meta["wagon"] = {kind: write_sheet(frames(src, kind, 128, 1.0), o, f"bulk-wagon-{kind}", 8, 4)
-                         for kind in ("color", "mask", "shadow")}
+                         for kind in ("color", "mask", "shadow", "load")}
 
     for key, layers in (
         ("b3", {"base": 1, "shadow": 1, "idle": 1, "top": 8}),
         ("b1", {"base": 1, "shadow": 1, "idle": 1, "extend": 8, "work": 8}),
         ("e1", {"idle": 1, "work": 8}),
     ):
-        o = origin_of(key, G)
         for v in range(1, 5):
             src = os.path.join(render_dir, key, f"v{v}")
             if not os.path.isdir(src):
                 continue
+            o = origin_of(src, G)
             entry = {}
             for kind, count in layers.items():
                 name = "work" if kind == "top" else kind
