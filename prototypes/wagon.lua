@@ -11,8 +11,7 @@ wagon.icons = { { icon = "__bulk-wagons__/graphics/icons/bulk-wagon.png", icon_s
 wagon.icon = nil
 wagon.inventory_size = slots
 wagon.minable = { mining_time = 0.5, result = shared.wagon }
--- alpha 0.5 like all vanilla rolling stock, the masks are made for it
-wagon.color = { r = 0.56, g = 0.23, b = 0.15, a = 0.5 }
+wagon.color = { r = 0.56, g = 0.23, b = 0.15, a = 1 }
 wagon.allow_manual_color = true
 wagon.factoriopedia_simulation = nil
 graphics.wagon_load()

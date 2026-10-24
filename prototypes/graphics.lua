@@ -164,7 +164,7 @@ function graphics.wagon_pictures(planet)
     rotated = {
       layers = {
         sheet(set.color, with({ tint = tint_for(planet) })),
-        sheet(set.mask, with({ flags = { "mask" }, apply_runtime_tint = true })),
+        sheet(set.mask, with({ flags = { "mask" }, apply_runtime_tint = true, tint_as_overlay = true })),
         sheet(set.shadow, with({ draw_as_shadow = true })),
       },
     },
