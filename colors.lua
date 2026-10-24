@@ -42,7 +42,7 @@ local function byte(value) return math.floor(value * 255 + 0.5) end
 
 local function refresh(frame, color)
   for _, c in pairs(CHANNELS) do
-    local row = frame.inner["bwc_row_" .. c]
+    local row = frame.children[1].inner["bwc_row_" .. c]
     row["bwc_slider_" .. c].slider_value = byte(color[c])
     row["bwc_text_" .. c].text = tostring(byte(color[c]))
   end
@@ -62,12 +62,11 @@ function colors.open_panel(player, record)
     },
   })
   frame.tags = { station = record.entity.unit_number }
-  local inner = frame.add({
-    type = "frame",
-    name = "inner",
-    style = "inside_shallow_frame_with_padding",
-    direction = "vertical",
-  })
+  -- same layout as the circuit panel above it
+  local outer = frame.add({ type = "frame", style = "inside_shallow_frame", direction = "vertical" })
+  local inner = outer.add({ type = "flow", name = "inner", direction = "vertical" })
+  inner.style.padding = { 8, 12, 12, 12 }
+  inner.style.vertical_spacing = 8
   for _, c in pairs(CHANNELS) do
     local row = inner.add({ type = "flow", name = "bwc_row_" .. c, direction = "horizontal" })
     row.style.vertical_align = "center"
@@ -124,7 +123,7 @@ function colors.on_gui_event(event)
   local color = normalize(colors.get(record))
   color[channel] = value / 255
   colors.set(record, color)
-  local row = frame.inner["bwc_row_" .. channel]
+  local row = frame.children[1].inner["bwc_row_" .. channel]
   if element.type == "slider" then
     row["bwc_text_" .. channel].text = tostring(byte(color[channel]))
   else
