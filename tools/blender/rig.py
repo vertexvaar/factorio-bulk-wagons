@@ -5,8 +5,9 @@ Factorio sprites are plain orthographic renders from roughly 50 degrees elevatio
 One world unit is one tile, 64 px per tile at the final size.
 
 Passes per frame:
-  color  - the lit sprite, transparent background
-  mask   - white where the runtime tint (train colour) applies, else transparent
+  color  - the lit sprite, transparent background; paint that takes the runtime tint
+           (train colour) is rendered neutral grey, as Factorio wants it under a mask
+  mask   - white where the runtime tint applies, else transparent
   shadow - only the shadow the object throws on the ground
 """
 import json
@@ -18,6 +19,7 @@ import bpy
 from mathutils import Vector
 
 TILE_PX = 64
+PAINT_GREY = 0.42  # albedo of tinted paint in the colour passes, like the wagon body
 ELEVATION = math.radians(50)
 SQRT2 = math.sqrt(2)
 
@@ -231,16 +233,32 @@ def _mix_value(nt, factor, a, b):
     return _math(nt, "ADD", _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", 1.0, factor), a), _math(nt, "MULTIPLY", factor, b))
 
 
+_SPECS = {}  # material name -> (color, keyword arguments), to build grey twins
+
+
+def _grey_twin(name):
+    """The material as plain grey paint, for colour passes of tinted parts."""
+    twin = bpy.data.materials.get(name + "_grey")
+    if twin is None:
+        color, kwargs = _SPECS[name]
+        twin = material(name + "_grey", (PAINT_GREY,) * 3, **kwargs)
+    return twin
+
+
 def material(name, color, roughness=0.5, metallic=0.0, grime=0.25, scale=6.0, bump=0.15, emission=None, rust=0.0,
-             scrape=None):
+             scrape=None, paint=False):
     """Principled material with procedural grime and grain, so flat surfaces read as worn metal.
 
     rust (0..1): how much of the surface is corroded through. Rust patches have a dark
     rim and get redder towards the middle; worn parts are left out of the tint mask, so
     they keep their colour whatever colour the train has.
     scrape (z_low, z_high, amount): paint rubbed off down to bare steel, strongest low
-    down, as on hopper slopes where the goods slide out."""
+    down, as on hopper slopes where the goods slide out.
+    paint: takes the runtime tint on every object that uses it (station colour)."""
     mat = bpy.data.materials.new(name)
+    _SPECS[name] = (color, dict(roughness=roughness, metallic=metallic, grime=grime, scale=scale, bump=bump,
+                                emission=emission, rust=rust, scrape=scrape))
+    mat["paint"] = paint
     mat.use_nodes = True
     nt = mat.node_tree
     bsdf = nt.nodes["Principled BSDF"]
@@ -477,19 +495,33 @@ def tube_path(name, points, radius, mat):
 
 # ---------------------------------------------------------------- rendering
 
-def _set_mask_mode(enabled, white, holdout):
+def _tinted(obj, i):
+    """Whether material slot i of obj takes the runtime tint."""
+    # "mask" marks the masked material slots: True = all, an int = only slot 0..n-1
+    masked = obj.get("mask")
+    if masked is True or masked == 1 and i == 0:
+        return True
+    return bool(bpy.data.materials[obj["orig_mats"][i]].get("paint"))
+
+
+def _set_paint_mode(mode, white, holdout):
+    """mode "mask": tinted parts white (where paint is left), the rest held out;
+    "grey": paint materials as grey paint; None: the original materials."""
     for obj in bpy.data.objects:
         if obj.type != "MESH" or obj.name == "shadow_catcher":
             continue
-        if enabled:
+        if mode:
             if "orig_mats" not in obj:
                 obj["orig_mats"] = [m.name for m in obj.data.materials]
-            # "mask" marks the masked material slots: True = all, an int = only slot 0..n-1
-            masked = obj.get("mask")
             for i in range(len(obj.data.materials)):
-                tinted = masked is True or masked == 1 and i == 0
-                twin = bpy.data.materials[obj["orig_mats"][i]].get("mask_mat")
-                obj.data.materials[i] = (bpy.data.materials[twin] if twin else white) if tinted else holdout
+                name = obj["orig_mats"][i]
+                if mode == "mask":
+                    twin = bpy.data.materials[name].get("mask_mat")
+                    obj.data.materials[i] = (bpy.data.materials[twin] if twin else white) if _tinted(obj, i) else holdout
+                else:
+                    # masked objects (the wagon body) are painted grey already
+                    paint = bpy.data.materials[name].get("paint")
+                    obj.data.materials[i] = _grey_twin(name) if paint else bpy.data.materials[name]
         elif "orig_mats" in obj:
             for i, name in enumerate(obj["orig_mats"]):
                 obj.data.materials[i] = bpy.data.materials[name]
@@ -539,7 +571,8 @@ def render_frames(out_dir, frames, orientation_of, passes=("color", "mask", "sha
     """Renders each frame index; orientation_of(i) gives the Factorio orientation (0..1, clockwise from north).
 
     Passes: color, mask, shadow, plus base/top which split the color pass into the
-    parts on the ground and the overhead parts (drawn above trains in game).
+    parts on the ground and the overhead parts (drawn above trains in game), and
+    base_mask/top_mask, their masks.
 
     pose(i), if given, is called before rendering frame i to set up animated parts.
     """
@@ -557,11 +590,12 @@ def render_frames(out_dir, frames, orientation_of, passes=("color", "mask", "sha
             pose(i)
         for kind in passes:
             catcher.hide_render = kind != "shadow"
+            part = kind[:-5] if kind.endswith("_mask") else kind
             for o in meshes:
                 if kind == "shadow":
                     o.visible_camera = False
-                elif kind in ("base", "top"):
-                    o.visible_camera = _layer_of(o) == kind
+                elif part in ("base", "top"):
+                    o.visible_camera = _layer_of(o) == part
                 elif kind == "hidden":
                     o.visible_camera = False
                 else:
@@ -569,13 +603,24 @@ def render_frames(out_dir, frames, orientation_of, passes=("color", "mask", "sha
             for o in meshes:
                 if o.get("load"):
                     o.hide_render = kind != "load"
-            _set_mask_mode(kind == "mask", white, holdout)
+            is_mask = kind == "mask" or kind.endswith("_mask")
+            _set_paint_mode("mask" if is_mask else "grey" if kind in ("color", "base", "top") else None, white, holdout)
             if kind == "load":
                 _set_load_mode(holdout)
-            scene.cycles.samples = {"mask": 4, "shadow": 16, "load": 16}.get(kind, samples)
-            scene.cycles.use_denoising = kind != "mask"
+            scene.cycles.samples = 4 if is_mask else {"shadow": 16, "load": 16}.get(kind, samples)
+            scene.cycles.use_denoising = not is_mask
             scene.render.filepath = os.path.join(out_dir, f"{kind}_{i:03d}.png")
             bpy.ops.render.render(write_still=True)
-        _set_mask_mode(False, white, holdout)
+        _set_paint_mode(None, white, holdout)
         for o in meshes:
             o.visible_camera = True
+
+
+def rename(out_dir, src, dst, count):
+    """Renames the frames src_000.. to dst_000.., masks included."""
+    src_mask = "mask" if src == "color" else src + "_mask"
+    for a, b in ((src, dst), (src_mask, dst + "_mask")):
+        for i in range(count):
+            path = os.path.join(out_dir, f"{a}_{i:03d}.png")
+            if os.path.exists(path):
+                os.replace(path, os.path.join(out_dir, f"{b}_{i:03d}.png"))

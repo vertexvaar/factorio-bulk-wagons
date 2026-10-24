@@ -57,6 +57,22 @@ shared.control_offset = { -2.5, 0.5 } -- variant 1, rotated like the port
 -- Hidden constant combinator that puts a station's wagon readings on its network.
 shared.signals = "bulk-station-signals"
 
+-- Entities that open a station's window (its hidden inventory or control box).
+function shared.station_window_names()
+  local names = {}
+  for _, base in pairs({ shared.pit, shared.loader }) do
+    names[#names + 1] = shared.store_name(base, true)
+    names[#names + 1] = shared.store_name(base, false)
+  end
+  for variant = 1, shared.variant_count do
+    names[#names + 1] = shared.control_name(variant)
+  end
+  return names
+end
+
+-- Default station colour. Like rolling stock, colours are applied at alpha 0.5.
+shared.station_color = { r = 0.45, g = 0.5, b = 0.22, a = 0.5 }
+
 function shared.wagon_name(planet) return with_planet(shared.wagon, planet) end
 
 -- Rotates a vector clockwise by (variant - 1) quarter turns.

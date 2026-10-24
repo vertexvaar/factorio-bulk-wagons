@@ -12,6 +12,9 @@ import pack  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(ROOT, "graphics", "entity")
+# default colours, as in prototypes/wagon.lua and shared.station_color
+WAGON_COLOR = (0.56, 0.23, 0.15)
+STATION_COLOR = (0.45, 0.5, 0.22)
 
 
 
@@ -89,9 +92,11 @@ def main(render_dir):
                          for kind in ("color", "mask", "shadow", "load")}
 
     for key, layers in (
-        ("b3", {"base": 1, "shadow": 1, "idle": 1, "extend": 8, "work": 8}),
-        ("b1", {"base": 1, "shadow": 1, "idle": 1, "extend": 8, "work": 8}),
-        ("e1", {"idle": 1, "extend": 8, "work": 8}),
+        ("b3", {"base": 1, "base_mask": 1, "shadow": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,
+                "work": 8, "work_mask": 8}),
+        ("b1", {"base": 1, "base_mask": 1, "shadow": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,
+                "work": 8, "work_mask": 8}),
+        ("e1", {"idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8, "work": 8, "work_mask": 8}),
     ):
         for v in range(1, 5):
             src = os.path.join(render_dir, key, f"v{v}")
@@ -126,11 +131,12 @@ def icons(render_dir, out_dir):
         return canvas
 
     w = os.path.join(render_dir, "w1")
-    wagon = pack.tinted(pack.load(w, "color", 40), pack.load(w, "mask", 40), (0.56, 0.23, 0.15))
+    wagon = pack.tinted(pack.load(w, "color", 40), pack.load(w, "mask", 40), WAGON_COLOR)
     fit(wagon, 64).save(os.path.join(out_dir, "bulk-wagon.png"))
     for key, name in (("e1", "unloading-pit"), ("b3", "belt-loader"), ("b1", "loading-station")):
         src = os.path.join(render_dir, key, "v1")
-        layers = [pack.load(src, kind, 0, G) for kind in ("base", "idle") if os.path.exists(os.path.join(src, f"{kind}_000.png"))]
+        layers = [pack.tinted(pack.load(src, kind, 0, G), pack.load(src, kind + "_mask", 0, G), STATION_COLOR)
+                  for kind in ("base", "idle") if os.path.exists(os.path.join(src, f"{kind}_000.png"))]
         img = layers[0].copy()
         for extra in layers[1:]:
             img.alpha_composite(extra)

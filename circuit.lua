@@ -1,6 +1,7 @@
 -- Circuit network features of the stations: an enable condition, reading the contents
 -- of a docked wagon (plus a "wagon docked" signal), the settings panel next to the
--- station window, and keeping settings and wires in blueprints and copy-paste.
+-- station window, and keeping settings and wires (and the station colour) in
+-- blueprints and copy-paste.
 --
 -- A station's wires attach to its hidden inventory ("store"). A hidden constant
 -- combinator, wired to the store by script, puts the wagon readings on that network.
@@ -137,6 +138,7 @@ function circuit.to_tags(record)
     read_wagon = s.read_wagon,
     docked_signal = s.docked_signal,
     wires = wires_of(record),
+    color = record.color,
   }
 end
 
@@ -171,6 +173,7 @@ function circuit.from_tags(record, tags)
     read_wagon = t.read_wagon == true,
     docked_signal = t.docked_signal == true,
   }
+  record.color = t.color
   local store = record.store
   if not (store and store.valid) then return end
   for _, wire in pairs(t.wires or {}) do
@@ -215,6 +218,7 @@ function circuit.copy(from, to)
     read_wagon = s.read_wagon,
     docked_signal = s.docked_signal,
   }
+  to.color = from.color
 end
 
 --------------------------------------------------------------------------------

@@ -1,17 +1,14 @@
 local shared = require("shared")
 local circuit = require("circuit")
+local colors = require("colors")
 
 local TRANSFER_PERIOD = 30 -- ticks between transfer passes
 local SWEEP_PERIOD = 60 -- ticks between checks for forbidden items in wagons
 local OPEN_GUI_PERIOD = 10 -- ticks between checks of wagons a player has open
 local PORT_NAMES = { [shared.port] = true, [shared.rail_port] = true }
 local STORE_NAMES = {}
-for _, base in pairs({ shared.pit, shared.loader }) do
-  STORE_NAMES[shared.store_name(base, true)] = true
-  STORE_NAMES[shared.store_name(base, false)] = true
-end
-for variant = 1, shared.variant_count do
-  STORE_NAMES[shared.control_name(variant)] = true
+for _, name in pairs(shared.station_window_names()) do
+  STORE_NAMES[name] = true
 end
 
 -- Items that are bulk goods but not (or not always) a mined resource.
@@ -183,6 +180,8 @@ end
 local HAS_STORE = { [shared.pit] = true, [shared.loader] = true, [shared.belt_loader] = true }
 local SPRITE_KEY = { [shared.pit] = "e1", [shared.belt_loader] = "b3", [shared.loader] = "b1" }
 local OVERLAY_LAYER = { e1 = "rail-chain-signal-metal", b3 = "higher-object-under", b1 = "higher-object-under" }
+-- just above the station picture ("lower-object-above-shadow")
+local BASE_MASK_LAYER = "lower-object-overlay"
 local ANIMATION_SPEED = 0.25
 local EXTEND_TICKS = 32 -- 8 frames at a quarter frame per tick
 
@@ -213,23 +212,16 @@ local function create_store(entity, info)
   return store
 end
 
--- Draws the parts that belong above trains (or the running animation of the pit).
-local function draw_overlay(record, kind)
-  if record.overlay and record.overlay.valid then record.overlay.destroy() end
-  record.overlay = nil
-  local key = SPRITE_KEY[record.base]
-  local name = "bulk-" .. key .. "-" .. record.variant .. "-" .. kind
-  local entity = record.entity
-  local planet = variant_of[entity.name].planet
-  local tint = planet ~= shared.default_planet and shared.placeholder_tint[planet] or nil
-  local params = {
-    surface = entity.surface,
-    target = entity,
-    render_layer = OVERLAY_LAYER[key],
-    tint = tint,
-  }
+local function destroy(record, key)
+  if record[key] and record[key].valid then record[key].destroy() end
+  record[key] = nil
+end
+
+-- Draws a still sprite or (with animated) a running animation on the station.
+local function draw(record, name, layer, tint, animated)
+  local params = { surface = record.entity.surface, target = record.entity, render_layer = layer, tint = tint }
   local ok, object
-  if kind == "idle" then
+  if not animated then
     if not helpers.is_valid_sprite_path(name) then return end
     params.sprite = name
     ok, object = pcall(rendering.draw_sprite, params)
@@ -240,7 +232,30 @@ local function draw_overlay(record, kind)
     params.animation_offset = -(game.tick * ANIMATION_SPEED)
     ok, object = pcall(rendering.draw_animation, params)
   end
-  if ok then record.overlay = object end
+  if ok then return object end
+end
+
+-- Draws the parts that belong above trains (or the running animation of the pit),
+-- and their colour mask on top.
+local function draw_overlay(record, kind)
+  destroy(record, "overlay")
+  destroy(record, "mask")
+  local key = SPRITE_KEY[record.base]
+  local name = "bulk-" .. key .. "-" .. record.variant .. "-" .. kind
+  local planet = variant_of[record.entity.name].planet
+  local tint = planet ~= shared.default_planet and shared.placeholder_tint[planet] or nil
+  record.overlay = draw(record, name, OVERLAY_LAYER[key], tint, kind ~= "idle")
+  if record.overlay then
+    record.mask = draw(record, name .. "_mask", OVERLAY_LAYER[key], colors.get(record), kind ~= "idle")
+  end
+end
+
+-- (Re)draws the colour mask over the station picture and the overlay of the current state.
+local function draw_station(record)
+  destroy(record, "base_mask")
+  local name = "bulk-" .. SPRITE_KEY[record.base] .. "-" .. record.variant .. "-base_mask"
+  record.base_mask = draw(record, name, BASE_MASK_LAYER, colors.get(record), false)
+  draw_overlay(record, record.state == "work" and "work" or "idle")
 end
 
 local function set_state(record, state)
@@ -268,7 +283,8 @@ local function register_station(entity, info)
   script.register_on_object_destroyed(entity)
   circuit.attach(record)
   if record.store then circuit.on_any_built(record.store) end
-  set_state(record, "idle")
+  record.state = "idle"
+  draw_station(record)
   return record
 end
 
@@ -279,7 +295,9 @@ local function remove_station(unit_number, buffer, removing)
   local record = storage.stations[unit_number]
   if not record then return end
   storage.stations[unit_number] = nil
-  if record.overlay and record.overlay.valid then record.overlay.destroy() end
+  for _, key in pairs({ "overlay", "mask", "base_mask" }) do
+    destroy(record, key)
+  end
   circuit.detach(record)
   local store = record.store
   if store and store.valid and store ~= removing then
@@ -492,7 +510,10 @@ local function on_built(event)
     info = variant_of[entity.name]
   end
   local record = register_station(entity, info)
-  if record and event.tags then circuit.from_tags(record, event.tags) end
+  if record and event.tags then
+    circuit.from_tags(record, event.tags)
+    colors.apply(record)
+  end
 end
 
 local function on_removed(event)
@@ -572,7 +593,11 @@ local function on_gui_opened(event)
     storage.open_wagons[event.player_index] = entity
   elseif entity and entity.valid and STORE_NAMES[entity.name] then
     local record = storage.stations[storage.store_owner[entity.unit_number] or 0]
-    if record then circuit.open_panel(game.get_player(event.player_index), record) end
+    if record then
+      local player = game.get_player(event.player_index)
+      circuit.open_panel(player, record)
+      colors.open_panel(player, record)
+    end
   end
 end
 
@@ -581,6 +606,7 @@ local function on_gui_closed(event)
   storage.open_wagons[event.player_index] = nil
   if entity and entity.valid and STORE_NAMES[entity.name] then
     circuit.close_panel(game.get_player(event.player_index))
+    colors.close_panel(game.get_player(event.player_index))
   end
   if entity and entity.valid and is_wagon(entity) then purge_wagon(entity, game.get_player(event.player_index)) end
 end
@@ -727,13 +753,20 @@ local function rescan()
   for _, surface in pairs(game.surfaces) do
     for _, wagon in pairs(surface.find_entities_filtered({ name = wagon_names })) do
       storage.wagons[wagon.unit_number] = wagon
+      -- wagons from 0.2.0 were coloured at full alpha; the masks are made for 0.5
+      local c = wagon.color
+      if c and c.a and c.a > 0.5 then wagon.color = { r = c.r, g = c.g, b = c.b, a = 0.5 } end
     end
     for _, station in pairs(surface.find_entities_filtered({ name = names })) do
       local info = variant_of[station.name]
       local record = register_station(station, info) or storage.stations[station.unit_number]
       -- stations from 0.1.0: the belt loader gains its control box, all gain the signal combinator
       if record and not (record.store and record.store.valid) then record.store = create_store(station, info) end
-      if record then circuit.attach(record) end
+      if record then
+        circuit.attach(record)
+        -- stations from 0.2.0 gain their colour masks, and graphics may have changed
+        draw_station(record)
+      end
     end
   end
 end
@@ -788,8 +821,12 @@ script.on_event({
   defines.events.on_gui_checked_state_changed,
   defines.events.on_gui_elem_changed,
   defines.events.on_gui_selection_state_changed,
-  defines.events.on_gui_text_changed,
 }, circuit.on_gui_changed)
+script.on_event(defines.events.on_gui_text_changed, function(event)
+  circuit.on_gui_changed(event)
+  colors.on_gui_event(event)
+end)
+script.on_event({ defines.events.on_gui_value_changed, defines.events.on_gui_click }, colors.on_gui_event)
 
 -- Blueprints carry the circuit settings and wires of a station in its tags.
 script.on_event(defines.events.on_player_setup_blueprint, function(event)
@@ -804,11 +841,20 @@ script.on_event(defines.events.on_player_setup_blueprint, function(event)
   end
 end)
 
--- Shift + right/left click copies circuit settings between stations.
+-- Shift + right/left click copies circuit settings and colour between stations, and
+-- the colour of rolling stock or a train stop onto a station.
 script.on_event(defines.events.on_entity_settings_pasted, function(event)
-  local from = event.source.valid and storage.stations[storage.store_owner[event.source.unit_number] or 0]
-  local to = event.destination.valid and storage.stations[storage.store_owner[event.destination.unit_number] or 0]
-  if from and to then circuit.copy(from, to) end
+  local source, destination = event.source, event.destination
+  if not (source.valid and destination.valid) then return end
+  local to = storage.stations[storage.store_owner[destination.unit_number] or 0]
+  if not to then return end
+  local from = storage.stations[storage.store_owner[source.unit_number] or 0]
+  if from then
+    circuit.copy(from, to)
+    colors.apply(to)
+  elseif source.color then
+    colors.set(to, source.color)
+  end
 end)
 
 script.on_nth_tick(3600, circuit.expire_pending)
@@ -847,6 +893,13 @@ remote.add_interface("bulk-wagons", {
     return record and record.store
   end,
   is_allowed = function(name) return storage.allowed[name] == true end,
+  -- Station colour: get, or set with a colour (nil resets).
+  station_color = function(entity, color, reset)
+    local record = entity and entity.valid and storage.stations[entity.unit_number]
+    if not record then return nil end
+    if color or reset then colors.set(record, color) end
+    return colors.get(record)
+  end,
   -- Turns and centres a station on the rail below it, as a hand-built one would be.
   align_station = function(entity)
     local info = entity and entity.valid and variant_of[entity.name]

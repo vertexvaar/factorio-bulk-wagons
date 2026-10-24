@@ -66,7 +66,7 @@ local function setup()
 
   -- vertical line: wagon over a pit (unloading), one over the silo, one over the belt loader
   rail_line(surface, true, 1, -61, 61)
-  local wagons = train(surface, true, 1, -30, 3, { r = 0.56, g = 0.23, b = 0.15 })
+  local wagons = train(surface, true, 1, -30, 3, { r = 0.56, g = 0.23, b = 0.15, a = 0.5 })
   -- wagon i is centred at -30 + 7 i; its compartments are at centre -1.3, 0, +1.3
   local y1, y2, y3 = -23, -16, -9
   local s = {}
@@ -80,11 +80,17 @@ local function setup()
 
   -- horizontal line with all three stations rotated, an empty train standing still
   rail_line(surface, false, 21, -61, 61)
-  local hw = train(surface, false, 21, 20, 2, { r = 0.18, g = 0.43, b = 0.66 })
-  station(surface, "bulk-unloading-pit-2", { 13, 21 })
-  station(surface, "bulk-loading-station-2", { 5, 21 })
-  station(surface, "bulk-belt-loader-4", { -9, 21 })
-  station(surface, "bulk-loading-station-2", { -21, 21 })
+  local hw = train(surface, false, 21, 20, 2, { r = 0.18, g = 0.43, b = 0.66, a = 0.5 })
+  -- station colours: pit and silo in the train's blue, the belt loader yellow, the last silo keeps the default
+  local colored = {
+    { station(surface, "bulk-unloading-pit-2", { 13, 21 }), { r = 0.18, g = 0.43, b = 0.66 } },
+    { station(surface, "bulk-loading-station-2", { 5, 21 }), { r = 0.18, g = 0.43, b = 0.66 } },
+    { station(surface, "bulk-belt-loader-4", { -9, 21 }), { r = 0.95, g = 0.75, b = 0.1 } },
+    { station(surface, "bulk-loading-station-2", { -21, 21 }), nil },
+  }
+  for _, entry in pairs(colored) do
+    if entry[2] then remote.call("bulk-wagons", "station_color", entry[1], entry[2]) end
+  end
   storage.s = s
   storage.hw = hw
 end

@@ -8,7 +8,7 @@ at (2.5, -0.5). The whole pit is one ground sprite, drawn below the rails in gam
 
 Renders per variant: idle_000 (still), extend_000..007 (flap openers rise to the wagon,
 played once when a wagon arrives) and work_000..007 (belt running, drive turning,
-beacon rotating, openers up).
+beacon rotating, openers up). Each comes with a *_mask twin for the station colour.
 """
 import math
 import os
@@ -51,10 +51,10 @@ def pit(p):
         cx, w = (x0 + x1) / 2, abs(x1 - x0)
         for sy in (-1, 1):
             rig.box(f"curb{sx}{sy}", (cx, sy * 0.9, -0.06), (w, 0.2, 0.24), p["concrete"], bevel=0.02)
-            kit.plate((cx, sy * 0.9, 0.065), (w, 0.2, 0.02), p["plate"], panels=4)
+            kit.plate((cx, sy * 0.9, 0.065), (w, 0.2, 0.02), p["olive"], panels=4)
             kit.hazard((cx, sy * 0.985, 0.03), (w - 0.1, 0.03, 0.05), stripes=int(w / 0.18))
         rig.box(f"end_wall{sx}", (sx * 2.9, 0, -0.06), (0.2, 1.6, 0.24), p["concrete"], bevel=0.02)
-        kit.plate((sx * 2.9, 0, 0.065), (0.2, 1.6, 0.02), p["plate"])
+        kit.plate((sx * 2.9, 0, 0.065), (0.2, 1.6, 0.02), p["olive"])
     # funnel walls: riveted steel sloping down to the belt trough
     rig.mesh("funnel", [
         (-2.8, -0.8, 0), (2.8, -0.8, 0), (2.8, 0.8, 0), (-2.8, 0.8, 0),
@@ -203,18 +203,16 @@ def render_variant(out, v):
     for o in ore:
         o.hide_render = True
     set_openers(0)
-    rig.render_frames(d, [0], lambda i: orient, passes=("color",), samples=32, pose=pose)
-    os.replace(os.path.join(d, "color_000.png"), os.path.join(d, "idle_000.png"))
-    rig.render_frames(d, list(range(EXTEND_FRAMES)), lambda i: orient, passes=("color",), samples=32,
+    rig.render_frames(d, [0], lambda i: orient, passes=("color", "mask"), samples=32, pose=pose)
+    rig.rename(d, "color", "idle", 1)
+    rig.render_frames(d, list(range(EXTEND_FRAMES)), lambda i: orient, passes=("color", "mask"), samples=32,
                       pose=lambda i: (pose(0), set_openers((i + 1) / EXTEND_FRAMES)))
-    for i in range(EXTEND_FRAMES):
-        os.replace(os.path.join(d, f"color_{i:03d}.png"), os.path.join(d, f"extend_{i:03d}.png"))
+    rig.rename(d, "color", "extend", EXTEND_FRAMES)
     for o in ore:
         o.hide_render = False
-    rig.render_frames(d, list(range(ANIM_FRAMES)), lambda i: orient, passes=("color",), samples=32,
+    rig.render_frames(d, list(range(ANIM_FRAMES)), lambda i: orient, passes=("color", "mask"), samples=32,
                       pose=lambda i: (pose(i), set_openers(1)))
-    for i in range(ANIM_FRAMES):
-        os.replace(os.path.join(d, f"color_{i:03d}.png"), os.path.join(d, f"work_{i:03d}.png"))
+    rig.rename(d, "color", "work", ANIM_FRAMES)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ Footprint for variant 1: 6 x 2 tiles, rail north-south through x in [-1, 1], por
 
 Renders per variant: base, shadow, idle (chute up), extend_000..007 (chute lowers onto
 the wagon, played once) and work_000..007 (elevator drive turning, chute down).
+Each comes with a *_mask twin for the station colour.
 """
 import math
 import os
@@ -64,10 +65,10 @@ def bin_and_chute(p):
     # the bin: riveted plate walls, ring stiffeners, roof
     zc = (BIN_BOTTOM + BIN_TOP) / 2
     h = BIN_TOP - BIN_BOTTOM
-    kit.plate((0, BIN_Y - HD, zc), (2 * HW, 0.05, h), p["plate"], axis="y")
-    kit.plate((0, BIN_Y + HD, zc), (2 * HW, 0.05, h), p["plate"], axis="y")
-    kit.plate((-HW, BIN_Y, zc), (0.05, 2 * HD, h), p["plate"], axis="x")
-    kit.plate((HW, BIN_Y, zc), (0.05, 2 * HD, h), p["plate"], axis="x")
+    kit.plate((0, BIN_Y - HD, zc), (2 * HW, 0.05, h), p["olive"], axis="y")
+    kit.plate((0, BIN_Y + HD, zc), (2 * HW, 0.05, h), p["olive"], axis="y")
+    kit.plate((-HW, BIN_Y, zc), (0.05, 2 * HD, h), p["olive"], axis="x")
+    kit.plate((HW, BIN_Y, zc), (0.05, 2 * HD, h), p["olive"], axis="x")
     for z in (BIN_BOTTOM + 0.35, BIN_BOTTOM + 0.8):
         for y in (BIN_Y - HD - 0.05, BIN_Y + HD + 0.05):
             kit.ibeam((-HW - 0.05, y, z), (HW + 0.05, y, z), size=0.07)
@@ -81,7 +82,7 @@ def bin_and_chute(p):
         (-HW, BIN_Y - HD, BIN_BOTTOM), (HW, BIN_Y - HD, BIN_BOTTOM), (HW, BIN_Y + HD, BIN_BOTTOM), (-HW, BIN_Y + HD, BIN_BOTTOM),
         (-0.24, CHUTE_Y - 0.24, PORTAL_Z + 0.3), (0.24, CHUTE_Y - 0.24, PORTAL_Z + 0.3), (0.24, CHUTE_Y + 0.24, PORTAL_Z + 0.3),
         (-0.24, CHUTE_Y + 0.24, PORTAL_Z + 0.3),
-    ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], p["plate"], bevel=0.015)
+    ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], p["olive"], bevel=0.015)
     for k in range(5):
         t = (k + 1) / 6
         a = (-HW + t * 2 * HW, BIN_Y - HD, BIN_BOTTOM)
@@ -179,16 +180,14 @@ def render_variant(out, v):
     orient = (v - 1) / 4
     set_chute(0)
     spin(0)
-    rig.render_frames(d, [0], lambda i: orient, passes=("base", "shadow", "top"), samples=32)
-    os.replace(os.path.join(d, "top_000.png"), os.path.join(d, "idle_000.png"))
-    rig.render_frames(d, list(range(EXTEND_FRAMES)), lambda i: orient, passes=("top",), samples=32,
+    rig.render_frames(d, [0], lambda i: orient, passes=("base", "base_mask", "shadow", "top", "top_mask"), samples=32)
+    rig.rename(d, "top", "idle", 1)
+    rig.render_frames(d, list(range(EXTEND_FRAMES)), lambda i: orient, passes=("top", "top_mask"), samples=32,
                       pose=lambda i: set_chute((i + 1) / EXTEND_FRAMES))
-    for i in range(EXTEND_FRAMES):
-        os.replace(os.path.join(d, f"top_{i:03d}.png"), os.path.join(d, f"extend_{i:03d}.png"))
-    rig.render_frames(d, list(range(ANIM_FRAMES)), lambda i: orient, passes=("top",), samples=32,
+    rig.rename(d, "top", "extend", EXTEND_FRAMES)
+    rig.render_frames(d, list(range(ANIM_FRAMES)), lambda i: orient, passes=("top", "top_mask"), samples=32,
                       pose=lambda i: (set_chute(1), spin(i)))
-    for i in range(ANIM_FRAMES):
-        os.replace(os.path.join(d, f"top_{i:03d}.png"), os.path.join(d, f"work_{i:03d}.png"))
+    rig.rename(d, "top", "work", ANIM_FRAMES)
 
 
 if __name__ == "__main__":

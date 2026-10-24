@@ -54,13 +54,14 @@ function graphics.station_picture(key, variant, planet)
 end
 
 -- Sprite and animation prototypes the script draws on top of stations:
--- bulk-<key>-<variant>-idle, -work (looping) and -extend (played once).
+-- bulk-<key>-<variant>-idle, -work (looping) and -extend (played once), each with
+-- a _mask twin in the station colour, plus -base_mask over the station picture.
 function graphics.station_overlays()
   local prototypes = {}
   for name, set in pairs(sprites) do
     if name ~= "wagon" then
       for kind, meta in pairs(set) do
-        if kind == "idle" or kind == "work" or kind == "extend" then
+        if kind ~= "base" and kind ~= "shadow" then
           if meta.frame_count > 1 then
             prototypes[#prototypes + 1] = {
               type = "animation",
@@ -125,7 +126,7 @@ function graphics.wagon_pictures(planet)
     rotated = {
       layers = {
         sheet(set.color, with({ tint = tint_for(planet) })),
-        sheet(set.mask, with({ flags = { "mask" }, apply_runtime_tint = true, tint_as_overlay = true })),
+        sheet(set.mask, with({ flags = { "mask" }, apply_runtime_tint = true })),
         sheet(set.shadow, with({ draw_as_shadow = true })),
       },
     },
