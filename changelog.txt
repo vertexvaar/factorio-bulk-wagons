@@ -12,7 +12,6 @@ Date: 2026-10-24
     - Unloading pit: gravel apron with a ragged edge blends it into the ground; its insides are only hinted at.
     - Stations can only be built across a straight rail and snap to the rail grid like rail signals, so three fit side by side under one wagon.
   Changes:
-    - Wagon sprites are stretched onto the square tile grid like the buildings, so a north-south wagon reaches the cars next to it.
     - Stations collide with buildings, trees, rocks, rail signals and each other.
     - Transfer rate default is 250 items/s per station, moved in small steps every 12 ticks.
     - Colour masks of wagon and stations now work like the vanilla ones (grey paint under the mask, colour at alpha 0.5), so they look the same as a locomotive in the same colour.

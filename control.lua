@@ -366,10 +366,10 @@ local function rail_axis(direction)
   if direction == defines.direction.east or direction == defines.direction.west then return false end
 end
 
--- The straight ground rail through the centre of a station, and whether it runs
--- north-south. With ghosts, a rail ghost counts too.
+-- The straight ground rail under the centre of a station (within a tile), and whether
+-- it runs north-south. With ghosts, a rail ghost counts too.
 local function straight_rail_at(surface, position, ghosts)
-  local area = { { position.x - 0.5, position.y - 0.5 }, { position.x + 0.5, position.y + 0.5 } }
+  local area = { { position.x - 1, position.y - 1 }, { position.x + 1, position.y + 1 } }
   for _, rail in pairs(surface.find_entities_filtered({ type = "straight-rail", area = area })) do
     local vertical = rail_axis(rail.direction)
     if vertical ~= nil then return rail, vertical end
@@ -405,7 +405,8 @@ local function replace(entity, params)
 end
 
 -- Picks the station variant for the planet it stands on. A station built by
--- hand (align) also turns and centres itself on the rail below it.
+-- hand (align) also turns and centres itself on the rail below it: onto the centre of
+-- a rail piece, like a rail signal in its slot, so three stations line up under a wagon.
 local function fit_station(entity, info, align)
   local variant = info.variant
   local position = { entity.position.x, entity.position.y }
@@ -413,11 +414,7 @@ local function fit_station(entity, info, align)
     local rail, vertical = straight_rail_at(entity.surface, entity.position)
     if rail then
       if vertical ~= shared.rail_is_vertical(variant) then variant = variant % shared.variant_count + 1 end
-      if vertical then
-        position[1] = rail.position.x
-      else
-        position[2] = rail.position.y
-      end
+      position = { rail.position.x, rail.position.y }
     end
   end
   local name = shared.variant_name(info.base, variant, planet_of(entity.surface))

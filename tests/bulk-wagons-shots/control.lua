@@ -91,6 +91,15 @@ local function setup()
   for _, entry in pairs(colored) do
     if entry[2] then remote.call("bulk-wagons", "station_color", entry[1], entry[2]) end
   end
+  -- side by side with vanilla: locomotive, cargo wagon, bulk wagon, locomotive
+  rail_line(surface, true, 31, -61, 61)
+  local cmp = {}
+  for i, name in ipairs({ "locomotive", "cargo-wagon", "bulk-wagon", "locomotive" }) do
+    cmp[i] = surface.create_entity({
+      name = name, force = "player", position = { 31, -21 + 7 * i },
+      direction = i == 4 and defines.direction.south or defines.direction.north, raise_built = true,
+    })
+  end
   storage.s = s
   storage.hw = hw
 end
@@ -111,13 +120,14 @@ script.on_event(defines.events.on_tick, function(event)
     [150] = { "vertical", { 3, -16 } },
     [151] = { "horizontal", { 0, 19 } },
     [152] = { "pit-close", { 3, -22 } },
+    [153] = { "train-compare", { 31, -3 } },
   }
   local shot = shots[age]
   if shot then
     game.take_screenshot({
       surface = game.surfaces.nauvis,
       position = shot[2],
-      resolution = { 1920, 1080 },
+      resolution = shot[1] == "train-compare" and { 1080, 1920 } or { 1920, 1080 },
       zoom = shot[1] == "pit-close" and 2 or 1,
       path = "bulk-shots/" .. shot[1] .. ".png",
       show_entity_info = false,
