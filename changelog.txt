@@ -7,8 +7,11 @@ Date: 2026-10-24
     - While goods move only the belts run; the chutes stay down.
     - Portal silo: the port belt visibly runs into a hooded intake on the bucket elevator.
     - Unloading pit: gravel apron with a ragged edge blends it into the ground; its insides are only hinted at.
+    - Green placement markers: while a station is in the cursor, every free spot on straight rails nearby is outlined.
   Changes:
     - Colour masks of wagon and stations now work like the vanilla ones (grey paint under the mask, colour at alpha 0.5), so they look the same as a locomotive in the same colour.
+  Bugfixes:
+    - The cargo heap now fits the hopper on north-south track (it sat too high).
 ---------------------------------------------------------------------------------------------------
 Version: 0.3.0
 Date: 2026-10-24
