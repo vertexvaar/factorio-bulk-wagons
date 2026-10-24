@@ -23,12 +23,18 @@ local function default_settings()
     constant = 0,
     read_wagon = false,
     docked_signal = false,
+    out_red = true,
+    out_green = true,
   }
 end
 
 function circuit.settings(record)
   record.settings = record.settings or default_settings()
-  return record.settings
+  local s = record.settings
+  -- settings from 0.2.0 sent on both wires
+  if s.out_red == nil then s.out_red = true end
+  if s.out_green == nil then s.out_green = true end
+  return s
 end
 
 --------------------------------------------------------------------------------
@@ -46,12 +52,24 @@ function circuit.attach(record)
   })
   if not combinator then return end
   combinator.destructible = false
-  for _, id in pairs({ RED, GREEN }) do
-    combinator
-      .get_wire_connector(id, true)
-      .connect_to(store.get_wire_connector(id, true), false, defines.wire_origin.script)
-  end
   record.signals = combinator
+  circuit.rewire(record)
+end
+
+-- Connects the hidden combinator to the wire colours the wagon readings go out on.
+function circuit.rewire(record)
+  local combinator, store = record.signals, record.store
+  if not (combinator and combinator.valid and store and store.valid) then return end
+  local s = circuit.settings(record)
+  for id, wanted in pairs({ [RED] = s.out_red, [GREEN] = s.out_green }) do
+    local own = combinator.get_wire_connector(id, true)
+    local target = store.get_wire_connector(id, true)
+    if wanted then
+      own.connect_to(target, false, defines.wire_origin.script)
+    else
+      own.disconnect_from(target, defines.wire_origin.script)
+    end
+  end
 end
 
 function circuit.detach(record)
@@ -137,6 +155,8 @@ function circuit.to_tags(record)
     constant = s.constant,
     read_wagon = s.read_wagon,
     docked_signal = s.docked_signal,
+    out_red = s.out_red,
+    out_green = s.out_green,
     wires = wires_of(record),
     color = record.color,
   }
@@ -172,7 +192,10 @@ function circuit.from_tags(record, tags)
     constant = t.constant or 0,
     read_wagon = t.read_wagon == true,
     docked_signal = t.docked_signal == true,
+    out_red = t.out_red ~= false,
+    out_green = t.out_green ~= false,
   }
+  circuit.rewire(record)
   record.color = t.color
   local store = record.store
   if not (store and store.valid) then return end
@@ -217,7 +240,10 @@ function circuit.copy(from, to)
     constant = s.constant,
     read_wagon = s.read_wagon,
     docked_signal = s.docked_signal,
+    out_red = s.out_red,
+    out_green = s.out_green,
   }
+  circuit.rewire(to)
   to.color = from.color
 end
 
@@ -247,15 +273,28 @@ function circuit.open_panel(player, record)
     anchor = anchor,
   })
   frame.tags = { station = record.entity.unit_number }
-  local inner = frame.add({ type = "frame", style = "inside_shallow_frame_with_padding", direction = "vertical" })
-  inner.add({
+  -- laid out like the vanilla circuit connection window: a subheader per section
+  local inner = frame.add({ type = "frame", style = "inside_shallow_frame", direction = "vertical" })
+
+  local function section(caption)
+    local header = inner.add({ type = "frame", style = "subheader_frame", direction = "horizontal" })
+    header.style.horizontally_stretchable = true
+    header.add({ type = "label", style = "subheader_caption_label", caption = caption })
+    local body = inner.add({ type = "flow", direction = "vertical" })
+    body.style.padding = { 8, 12, 12, 12 }
+    body.style.vertical_spacing = 8
+    return header, body
+  end
+
+  local _, condition = section({ "bulk-wagons.circuit-condition" })
+  condition.add({
     type = "checkbox",
     name = "bw_enable",
     caption = { "bulk-wagons.circuit-enable" },
     state = s.enable,
     tooltip = { "bulk-wagons.circuit-enable-tooltip" },
   })
-  local row = inner.add({ type = "flow", name = "bw_condition", direction = "horizontal" })
+  local row = condition.add({ type = "flow", name = "bw_condition", direction = "horizontal" })
   row.style.vertical_align = "center"
   row.add({ type = "choose-elem-button", name = "bw_signal", elem_type = "signal", signal = s.signal })
   row.add({
@@ -272,15 +311,31 @@ function circuit.open_panel(player, record)
     allow_negative = true,
   })
   field.style.width = 80
-  inner.add({ type = "line" })
-  inner.add({
+
+  local header, output = section({ "bulk-wagons.circuit-output" })
+  header.add({ type = "empty-widget" }).style.horizontally_stretchable = true
+  header.add({
+    type = "checkbox",
+    name = "bw_out_red",
+    caption = "R",
+    state = s.out_red,
+    tooltip = { "bulk-wagons.circuit-out-red" },
+  })
+  header.add({
+    type = "checkbox",
+    name = "bw_out_green",
+    caption = "G",
+    state = s.out_green,
+    tooltip = { "bulk-wagons.circuit-out-green" },
+  }).style.right_margin = 8
+  output.add({
     type = "checkbox",
     name = "bw_read_wagon",
     caption = { "bulk-wagons.circuit-read-wagon" },
     state = s.read_wagon,
     tooltip = { "bulk-wagons.circuit-read-wagon-tooltip" },
   })
-  inner.add({
+  output.add({
     type = "checkbox",
     name = "bw_docked",
     caption = { "bulk-wagons.circuit-docked" },
@@ -321,6 +376,12 @@ function circuit.on_gui_changed(event)
     s.read_wagon = element.state
   elseif name == "bw_docked" then
     s.docked_signal = element.state
+  elseif name == "bw_out_red" then
+    s.out_red = element.state
+    circuit.rewire(record)
+  elseif name == "bw_out_green" then
+    s.out_green = element.state
+    circuit.rewire(record)
   end
 end
 
