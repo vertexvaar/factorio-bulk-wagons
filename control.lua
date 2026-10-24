@@ -1,6 +1,7 @@
 local shared = require("shared")
 local circuit = require("circuit")
 local colors = require("colors")
+local markers = require("markers")
 
 local TRANSFER_PERIOD = 12 -- ticks between transfer passes (small steps, so goods flow steadily)
 local SWEEP_PERIOD = 60 -- ticks between checks for forbidden items in wagons
@@ -894,7 +895,10 @@ local built_events = {
   defines.events.script_raised_revive,
   defines.events.on_entity_cloned,
 }
-script.on_event(built_events, on_built)
+script.on_event(built_events, function(event)
+  on_built(event)
+  markers.redraw_all()
+end)
 
 local removed_events = {
   defines.events.on_player_mined_entity,
@@ -903,12 +907,21 @@ local removed_events = {
   defines.events.on_entity_died,
   defines.events.script_raised_destroy,
 }
-script.on_event(removed_events, on_removed)
+script.on_event(removed_events, function(event)
+  on_removed(event)
+  markers.redraw_all()
+end)
 script.on_event(defines.events.on_object_destroyed, on_object_destroyed)
 
 script.on_event("bulk-wagons-rotate", function(event) rotate_cursor(event, 1) end)
 script.on_event("bulk-wagons-reverse-rotate", function(event) rotate_cursor(event, -1) end)
 script.on_event(defines.events.on_player_main_inventory_changed, normalize_inventory)
+script.on_event(defines.events.on_player_cursor_stack_changed, function(event) markers.refresh(event.player_index) end)
+script.on_event(defines.events.on_player_changed_position, function(event) markers.on_moved(event.player_index) end)
+script.on_event(
+  { defines.events.on_player_changed_surface, defines.events.on_player_left_game },
+  function(event) markers.refresh(event.player_index) end
+)
 
 script.on_event(defines.events.on_gui_opened, on_gui_opened)
 script.on_event(defines.events.on_gui_closed, on_gui_closed)

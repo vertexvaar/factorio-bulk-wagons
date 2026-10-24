@@ -216,6 +216,25 @@ local function setup()
   local colored = remote.call("bulk-wagons", "station_color", row[1], { r = 1, g = 0, b = 0 })
   report(colored and colored.r == 1 and colored.a == 0.5, "station colour is stored at alpha 0.5")
 
+  -- Scene I: three silos side by side load one wagon together, and three belt
+  -- loaders, each fed its own ore, load another.
+  rail_line(surface, true, 61, -41, 41)
+  s.wagon_i = train(surface, true, 61, -20, -13)
+  s.silos_i = {}
+  for i, y in ipairs({ -15, -13, -11 }) do
+    local silo = surface.create_entity({ name = "bulk-loading-station", position = { 61, y }, force = "player", raise_built = true })
+    s.silos_i[i] = silo
+    if silo then remote.call("bulk-wagons", "get_inventory", silo).insert({ name = "coal", count = 300 }) end
+  end
+  rail_line(surface, true, 71, -41, 41)
+  s.wagon_j = train(surface, true, 71, -20, -13)
+  s.j_feeds = {}
+  for i, y in ipairs({ -15, -13, -11 }) do
+    surface.create_entity({ name = "bulk-belt-loader", position = { 71, y }, force = "player", raise_built = true })
+    s.j_feeds[i] = { belts = belt_run(surface, { 80.5, y - 0.5 }, { -1, 0 }, 7, defines.direction.west),
+      item = ({ "iron-ore", "copper-ore", "stone" })[i] }
+  end
+
   if game.planets.vulcanus then setup_vulcanus(s) end
 
   storage.scene = s
@@ -228,10 +247,14 @@ end
 
 local function feed()
   local s = storage.scene
-  for _, belts in pairs({ s.in_belts, s.f_belts }) do
+  local runs = { { s.in_belts, "copper-ore" }, { s.f_belts, "copper-ore" } }
+  for _, f in pairs(s.j_feeds) do
+    runs[#runs + 1] = { f.belts, f.item }
+  end
+  for _, run in pairs(runs) do
     for i = 1, 2 do
-      local line = belts[1].get_transport_line(i)
-      if line.can_insert_at_back() then line.insert_at_back({ name = "copper-ore", count = 1 }) end
+      local line = run[1][1].get_transport_line(i)
+      if line.can_insert_at_back() then line.insert_at_back({ name = run[2], count = 1 }) end
     end
   end
 end
@@ -274,6 +297,21 @@ local function check()
   s.f_count = count(wagon_f, "copper-ore")
   report(s.f_count > 0, "belt loader feeds wagon directly", s.f_count .. " copper")
   report(remote.call("bulk-wagons", "get_inventory", s.belt_loader) == nil, "belt loader has no inventory")
+
+  local wagon_i = s.wagon_i.get_inventory(defines.inventory.cargo_wagon)
+  local emptied = 0
+  for _, silo in pairs(s.silos_i) do
+    if silo.valid and remote.call("bulk-wagons", "get_inventory", silo).is_empty() then emptied = emptied + 1 end
+  end
+  report(emptied == 3 and count(wagon_i, "coal") == 900, "three silos load one wagon together",
+    emptied .. " silos empty, " .. count(wagon_i, "coal") .. " coal")
+  local wagon_j = s.wagon_j.get_inventory(defines.inventory.cargo_wagon)
+  local got = {}
+  for _, f in pairs(s.j_feeds) do
+    got[#got + 1] = f.item .. "=" .. count(wagon_j, f.item)
+  end
+  report(count(wagon_j, "iron-ore") > 0 and count(wagon_j, "copper-ore") > 0 and count(wagon_j, "stone") > 0,
+    "three belt loaders load one wagon together", table.concat(got, " "))
 
   if s.wagon_v then
     local wagon_v = s.wagon_v.get_inventory(defines.inventory.cargo_wagon)
