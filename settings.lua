@@ -38,7 +38,7 @@ data:extend({
     type = "int-setting",
     name = "bulk-wagons-transfer-rate",
     setting_type = "runtime-global",
-    default_value = 240,
+    default_value = 250,
     minimum_value = 1,
     maximum_value = 100000,
     order = "a",

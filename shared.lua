@@ -54,6 +54,11 @@ function shared.control_name(variant) return shared.belt_loader .. "-control-" .
 
 shared.control_offset = { -2.5, 0.5 } -- variant 1, rotated like the port
 
+-- Collision layer of the stations. Buildings, trees, rocks, signals and the like get it
+-- too (data-final-fixes.lua), rails and trains do not, so a station fits across the
+-- track but not onto anything else.
+shared.collision_layer = "bulk_wagons_station"
+
 -- Hidden constant combinator that puts a station's wagon readings on its network.
 shared.signals = "bulk-station-signals"
 

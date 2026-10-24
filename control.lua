@@ -2,7 +2,7 @@ local shared = require("shared")
 local circuit = require("circuit")
 local colors = require("colors")
 
-local TRANSFER_PERIOD = 30 -- ticks between transfer passes
+local TRANSFER_PERIOD = 12 -- ticks between transfer passes (small steps, so goods flow steadily)
 local SWEEP_PERIOD = 60 -- ticks between checks for forbidden items in wagons
 local OPEN_GUI_PERIOD = 10 -- ticks between checks of wagons a player has open
 local PORT_NAMES = { [shared.port] = true, [shared.rail_port] = true }
@@ -62,6 +62,7 @@ local function init_storage()
   storage.store_owner = storage.store_owner or {} -- store unit_number -> station unit_number
   storage.pending_wires = storage.pending_wires or {} -- position key -> wires waiting for an entity
   storage.cargo = storage.cargo or {} -- wagon unit_number -> { wagon, render, frame, item }
+  storage.ghost_checks = storage.ghost_checks or {} -- station ghosts placed by hand, checked next tick
   -- the data stage reports which generated graphics exist
   local info = prototypes.mod_data["bulk-wagons-graphics"]
   storage.has_load_animation = info ~= nil and info.data.load == true
@@ -324,11 +325,24 @@ local function remove_station(unit_number, buffer, removing)
   if record.entity.valid and record.entity ~= removing then record.entity.destroy() end
 end
 
-local function straight_rail_in(surface, area)
+local function rail_axis(direction)
+  if direction == defines.direction.north or direction == defines.direction.south then return true end
+  if direction == defines.direction.east or direction == defines.direction.west then return false end
+end
+
+-- The straight ground rail through the centre of a station, and whether it runs
+-- north-south. With ghosts, a rail ghost counts too.
+local function straight_rail_at(surface, position, ghosts)
+  local area = { { position.x - 0.5, position.y - 0.5 }, { position.x + 0.5, position.y + 0.5 } }
   for _, rail in pairs(surface.find_entities_filtered({ type = "straight-rail", area = area })) do
-    local d = rail.direction
-    if d == defines.direction.north or d == defines.direction.south then return rail, true end
-    if d == defines.direction.east or d == defines.direction.west then return rail, false end
+    local vertical = rail_axis(rail.direction)
+    if vertical ~= nil then return rail, vertical end
+  end
+  if ghosts then
+    for _, ghost in pairs(surface.find_entities_filtered({ ghost_type = "straight-rail", area = area })) do
+      local vertical = rail_axis(ghost.direction)
+      if vertical ~= nil then return ghost, vertical end
+    end
   end
 end
 
@@ -360,7 +374,7 @@ local function fit_station(entity, info, align)
   local variant = info.variant
   local position = { entity.position.x, entity.position.y }
   if align then
-    local rail, vertical = straight_rail_in(entity.surface, entity.bounding_box)
+    local rail, vertical = straight_rail_at(entity.surface, entity.position)
     if rail then
       if vertical ~= shared.rail_is_vertical(variant) then variant = variant % shared.variant_count + 1 end
       if vertical then
@@ -487,6 +501,33 @@ end
 --------------------------------------------------------------------------------
 -- Build / remove events
 
+-- Stations only go onto straight rails: one built elsewhere is taken back.
+local function refuse(entity, info, player)
+  local surface, position, quality = entity.surface, entity.position, entity.quality.name
+  if player and player.valid then
+    player.create_local_flying_text({ text = { "bulk-wagons.needs-rail" }, position = position })
+    player.play_sound({ path = "utility/cannot_build" })
+  end
+  entity.destroy()
+  local stack = { name = info.base, count = 1, quality = quality }
+  local inserted = player and player.valid and player.insert(stack) or 0
+  if inserted == 0 then surface.spill_item_stack({ position = position, stack = stack }) end
+end
+
+-- Ghosts of stations placed off the rails disappear again.
+local function check_ghosts()
+  if not next(storage.ghost_checks) then return end
+  for _, check in pairs(storage.ghost_checks) do
+    local ghost = check.ghost
+    if ghost.valid and not straight_rail_at(ghost.surface, ghost.position, true) then
+      local player = game.get_player(check.player_index)
+      if player then player.create_local_flying_text({ text = { "bulk-wagons.needs-rail" }, position = ghost.position }) end
+      ghost.destroy()
+    end
+  end
+  storage.ghost_checks = {}
+end
+
 local function on_built(event)
   local entity = event.entity or event.destination
   if not (entity and entity.valid) then return end
@@ -502,10 +543,20 @@ local function on_built(event)
     if entity and entity.valid then storage.wagons[entity.unit_number] = entity end
     return
   end
+  if entity.name == "entity-ghost" and variant_of[entity.ghost_name] and event.name == defines.events.on_built_entity then
+    -- checked a tick later, when the rails of the same blueprint exist as well
+    storage.ghost_checks[#storage.ghost_checks + 1] = { ghost = entity, player_index = event.player_index }
+    return
+  end
   local info = variant_of[entity.name]
   if not info then return end
+  local by_hand = event.name == defines.events.on_built_entity
+  if by_hand and not straight_rail_at(entity.surface, entity.position) then
+    refuse(entity, info, game.get_player(event.player_index))
+    return
+  end
   if not cloned then
-    entity = fit_station(entity, info, event.name == defines.events.on_built_entity)
+    entity = fit_station(entity, info, by_hand)
     if not (entity and entity.valid) then return end
     info = variant_of[entity.name]
   end
@@ -863,6 +914,7 @@ script.on_nth_tick(TRANSFER_PERIOD, transfer_pass)
 script.on_nth_tick(8, finish_transitions)
 script.on_nth_tick(SWEEP_PERIOD, sweep_wagons)
 script.on_nth_tick(2, turn_cargo)
+script.on_nth_tick(1, check_ghosts)
 script.on_nth_tick(OPEN_GUI_PERIOD, check_open_wagons)
 
 remote.add_interface("bulk-wagons", {

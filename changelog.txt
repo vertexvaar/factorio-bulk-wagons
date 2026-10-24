@@ -3,7 +3,10 @@ Version: 0.3.0
 Date: 2026-10-24
   Features:
     - Stations can be coloured: a colour panel next to the station window, or Shift + right click on a locomotive, wagon or train stop and Shift + left click on the station. Blueprints and copy-paste keep the colour.
+    - Stations can only be built across a straight rail and snap to the rail grid like rail signals, so three fit side by side under one wagon.
   Changes:
+    - Stations collide with buildings, trees, rocks, rail signals and each other.
+    - Transfer rate default is 250 items/s per station, moved in small steps every 12 ticks.
     - Colour masks of wagon and stations now work like the vanilla ones (grey paint under the mask, colour at alpha 0.5), so they look the same as a locomotive in the same colour.
 ---------------------------------------------------------------------------------------------------
 Version: 0.2.0

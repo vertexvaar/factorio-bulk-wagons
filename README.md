@@ -9,7 +9,7 @@ Factorio 2.1 mod (Space Age optional) that adds a bulk wagon for ores and other 
 - Stations are colourable like the wagon: colour panel next to the station window, or copy the colour from a locomotive, wagon or train stop with Shift + right/left click. The masks work like the vanilla ones, so a station in the train's colour matches it.
 - Every Space Age planet gets its own look for wagon and stations; the right variant is placed automatically, the item stays the same.
 - Circuit network: station contents are readable; a panel next to the station window adds an enable/disable condition, reading the docked wagon's contents and a wagon docked signal (W = 1). Blueprints keep settings and wires.
-- One station per compartment, like pumps at a fluid wagon. Stations snap onto the rail when built; press R while placing to switch the port side.
+- One station per compartment, like pumps at a fluid wagon. Stations can only be built across a straight rail, snap to the rail grid like rail signals (three side by side per wagon) and collide with buildings; press R while placing to switch the port side.
 
 ## Settings
 
@@ -19,7 +19,7 @@ Factorio 2.1 mod (Space Age optional) that adds a bulk wagon for ores and other 
 | Unloading pit size (× wagon) | startup | 3 |
 | Loading station size (× wagon) | startup | 3 |
 | Built-in belt speed | startup | express |
-| Transfer rate per station (items/s) | map | 240 |
+| Transfer rate per station (items/s) | map | 250 |
 | Additional bulk items (comma separated) | map | empty |
 
 Other mods can register bulk goods with `remote.call("bulk-wagons", "add_allowed_items", {"my-ore"})`.

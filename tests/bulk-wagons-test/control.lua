@@ -201,6 +201,21 @@ local function setup()
   local ports = surface.find_entities_filtered({ name = "bulk-station-port", area = { { 4, 28 }, { 10, 36 } } })
   report(#ports == 1 and ports[1].loader_container ~= nil and ports[1].loader_container.name == "bulk-loading-station-store-h", "aligned station has its port", #ports .. " ports")
 
+  -- Scene F: placement. Stations go across the track, three in a row, but not onto buildings.
+  local row = {}
+  for i, x in ipairs({ 25, 27, 29 }) do
+    local spec = { name = "bulk-unloading-pit-2", position = { x, 31 }, force = "player", raise_built = true }
+    row[i] = surface.can_place_entity(spec) and surface.create_entity(spec)
+  end
+  report(row[1] and row[2] and row[3] and true, "three stations fit side by side on the rail")
+  surface.create_entity({ name = "assembling-machine-1", position = { 36.5, 28.5 }, force = "player" })
+  report(not surface.can_place_entity({ name = "bulk-loading-station-2", position = { 37, 31 }, force = "player" }),
+    "station collides with buildings")
+  report(not surface.can_place_entity({ name = "bulk-loading-station-2", position = { 27, 31 }, force = "player" }),
+    "stations do not overlap")
+  local colored = remote.call("bulk-wagons", "station_color", row[1], { r = 1, g = 0, b = 0 })
+  report(colored and colored.r == 1 and colored.a == 0.5, "station colour is stored at alpha 0.5")
+
   if game.planets.vulcanus then setup_vulcanus(s) end
 
   storage.scene = s

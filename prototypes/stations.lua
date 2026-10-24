@@ -6,10 +6,15 @@ local wagon_slots = settings.startup["bulk-wagons-wagon-slots"].value
 local gfx = "__bulk-wagons__/graphics/placeholder/"
 
 -- Stations straddle the track. They must not collide with rails (so they can be
--- built across them) or with trains, but must block buildings and belts.
--- Players are blocked too, except on the pit whose grate is walkable.
-local station_mask = { layers = { player = true, is_object = true, transport_belt = true } }
-local walkable_mask = { layers = { is_object = true, transport_belt = true } }
+-- built across them) or with trains, but must block buildings and belts (via their
+-- own layer, see shared.collision_layer). Players are blocked too, except on the
+-- pit whose grate is walkable.
+data:extend({ { type = "collision-layer", name = shared.collision_layer } })
+local station_mask = {
+  layers = { [shared.collision_layer] = true, player = true, transport_belt = true, water_tile = true, is_object = true },
+}
+local walkable_mask =
+  { layers = { [shared.collision_layer] = true, transport_belt = true, water_tile = true, is_object = true } }
 
 -- A station is a visual entity (simple-entity-with-owner: draws on a chosen render
 -- layer, rotates through its variants, shows in ghosts and blueprints). Stations with
@@ -41,6 +46,9 @@ local function station_variants(def)
         collision_box = { { -half_w + 0.1, -half_h + 0.1 }, { half_w - 0.1, half_h - 0.1 } },
         selection_box = { { -half_w, -half_h }, { half_w, half_h } },
         collision_mask = def.walkable and walkable_mask or station_mask,
+        -- snaps to the rail grid: the centre lands on a straight rail's centre, like rail
+        -- signals in their slots, so three stations line up under one wagon
+        build_grid_size = 2,
         render_layer = def.render_layer,
         picture = picture or {
           filename = gfx .. def.placeholder .. "-" .. variant .. ".png",
