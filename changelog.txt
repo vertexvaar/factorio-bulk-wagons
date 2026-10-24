@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.1
+Date: 2026-10-24
+  Features:
+    - Stations can be coloured: a colour panel next to the station window, or Shift + right click on a locomotive, wagon or train stop and Shift + left click on the station. Blueprints and copy-paste keep the colour.
+    - Loaded wagons show how full they are (four heap heights).
+    - While goods move only the belts run; the chutes stay down.
+    - Portal silo: the port belt visibly runs into a hooded intake on the bucket elevator.
+    - Unloading pit: gravel apron with a ragged edge blends it into the ground; its insides are only hinted at.
+  Changes:
+    - Colour masks of wagon and stations now work like the vanilla ones (grey paint under the mask, colour at alpha 0.5), so they look the same as a locomotive in the same colour.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.0
 Date: 2026-10-24
   Features:
