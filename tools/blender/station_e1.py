@@ -44,17 +44,125 @@ def belt_point(u):
     return (BELT_FLAT_END + t * (BELT_END - BELT_FLAT_END), BELT_Y, DEPTH + 0.2 + t * (-DEPTH - 0.12))
 
 
+def _alpha_material(name, nt_builder):
+    """Material whose colour and alpha come from nt_builder(nt, coord) -> (color socket, alpha socket)."""
+    import bpy
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    bsdf.inputs["Roughness"].default_value = 0.95
+    coord = nt.nodes.new("ShaderNodeTexCoord")
+    color, alpha = nt_builder(nt, coord)
+    if color is not None:
+        nt.links.new(color, bsdf.inputs["Base Color"])
+    else:
+        bsdf.inputs["Base Color"].default_value = (0, 0, 0, 1)
+    if isinstance(alpha, float):
+        bsdf.inputs["Alpha"].default_value = alpha
+    else:
+        nt.links.new(alpha, bsdf.inputs["Alpha"])
+    return mat
+
+
+def _math(nt, op, a, b=None):
+    node = nt.nodes.new("ShaderNodeMath")
+    node.operation = op
+    for i, v in enumerate((a, b)):
+        if v is None:
+            continue
+        if isinstance(v, (int, float)):
+            node.inputs[i].default_value = v
+        else:
+            nt.links.new(v, node.inputs[i])
+    return node.outputs[0]
+
+
+def apron(p):
+    """Gravel and trodden earth around the pit that fade into the ground with a ragged
+    edge, like the ballast of the rails, so the pit has no hard outline. Left out over
+    the track, where the game draws its own ballast."""
+    def build(nt, coord):
+        xyz = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(coord.outputs["Object"], xyz.inputs[0])
+        ax = _math(nt, "ABSOLUTE", xyz.outputs["X"])
+        ay = _math(nt, "ABSOLUTE", xyz.outputs["Y"])
+        # distance outside the 6 x 2 footprint, roughened by noise
+        out_x = _math(nt, "MAXIMUM", _math(nt, "SUBTRACT", ax, 2.85), 0.0)
+        out_y = _math(nt, "MAXIMUM", _math(nt, "SUBTRACT", ay, 0.85), 0.0)
+        dist = _math(nt, "SQRT", _math(nt, "ADD", _math(nt, "MULTIPLY", out_x, out_x), _math(nt, "MULTIPLY", out_y, out_y)))
+        noise = nt.nodes.new("ShaderNodeTexNoise")
+        noise.inputs["Scale"].default_value = 3.5
+        noise.inputs["Detail"].default_value = 6
+        nt.links.new(coord.outputs["Object"], noise.inputs["Vector"])
+        ragged = _math(nt, "ADD", dist, _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", noise.outputs["Fac"], 0.5), 0.5))
+        fade = _math(nt, "SUBTRACT", 1.0, _math(nt, "DIVIDE", ragged, 0.6))
+        fade.node.use_clamp = True
+        # nothing over the track bed
+        off_track = _math(nt, "GREATER_THAN", ax, 1.05)
+        alpha = _math(nt, "MULTIPLY", fade, off_track)
+        # grey gravel with darker earth between the stones
+        stones = nt.nodes.new("ShaderNodeTexVoronoi")
+        stones.inputs["Scale"].default_value = 26
+        nt.links.new(coord.outputs["Object"], stones.inputs["Vector"])
+        ramp = nt.nodes.new("ShaderNodeValToRGB")
+        ramp.color_ramp.elements[0].color = (0.16, 0.155, 0.15, 1)
+        ramp.color_ramp.elements[1].position = 0.55
+        ramp.color_ramp.elements[1].color = (0.035, 0.03, 0.025, 1)
+        nt.links.new(stones.outputs["Distance"], ramp.inputs["Fac"])
+        return ramp.outputs["Color"], alpha
+    mat = _alpha_material("apron", build)
+    rig.mesh("apron", [(-3.6, -1.6, 0.005), (3.6, -1.6, 0.005), (3.6, 1.6, 0.005), (-3.6, 1.6, 0.005)], [(0, 1, 2, 3)], mat)
+    # a few loose stones spilled over the edge
+    import random
+    rnd = random.Random(7)
+    for k in range(60):
+        sx = rnd.choice((-1, 1))
+        x = sx * rnd.uniform(1.15, 3.25)
+        y = rnd.choice((-1, 1)) * rnd.uniform(0.75, 1.3) if abs(x) < 2.85 else rnd.uniform(-1.1, 1.1)
+        s = rnd.uniform(0.03, 0.06)
+        rig.box(f"stone{k}", (x, y, s * 0.3), (s, s * rnd.uniform(0.7, 1.2), s * 0.6), p["concrete"], bevel=0.01,
+                rotation=(0, 0, rnd.uniform(0, 3.14)))
+
+
+def ground():
+    """Holdout at ground level with a hole for the pit opening: whatever lies below
+    ground outside the opening (curb sides, beams) stays hidden, as in the real ground."""
+    import bpy
+    mat = bpy.data.materials.new("ground_holdout")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.remove(nt.nodes["Principled BSDF"])
+    ho = nt.nodes.new("ShaderNodeHoldout")
+    nt.links.new(ho.outputs[0], nt.nodes["Material Output"].inputs["Surface"])
+    ox, oy, ix, iy, z = 5.0, 3.0, 2.8, 0.8, -0.001
+    verts = [(-ox, -oy, z), (ox, -oy, z), (ox, oy, z), (-ox, oy, z), (-ix, -iy, z), (ix, -iy, z), (ix, iy, z), (-ix, iy, z)]
+    faces = [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    obj = rig.mesh("ground", verts, faces, mat)
+    obj.visible_shadow = False
+
+
+def haze(p):
+    """Dims everything below ground level: the pit's insides are only hinted at."""
+    import bpy
+    mat = _alpha_material("haze", lambda nt, coord: (None, 0.62))
+    obj = rig.mesh("haze", [(-2.85, -0.85, -0.08), (2.85, -0.85, -0.08), (2.85, 0.85, -0.08), (-2.85, 0.85, -0.08)],
+                   [(0, 1, 2, 3)], mat)
+    obj.visible_shadow = False
+
+
 def pit(p):
-    # concrete curbs with riveted steel cover plates and hazard edges
+    # concrete curbs, sunk flush with the ground, with riveted steel cover plates; the
+    # gravel apron overlaps their outer edge
     for sx in (-1, 1):
         x0, x1 = sx * 1.02, sx * 2.98
         cx, w = (x0 + x1) / 2, abs(x1 - x0)
         for sy in (-1, 1):
-            rig.box(f"curb{sx}{sy}", (cx, sy * 0.9, -0.06), (w, 0.2, 0.24), p["concrete"], bevel=0.02)
-            kit.plate((cx, sy * 0.9, 0.065), (w, 0.2, 0.02), p["olive"], panels=4)
-            kit.hazard((cx, sy * 0.985, 0.03), (w - 0.1, 0.03, 0.05), stripes=int(w / 0.18))
-        rig.box(f"end_wall{sx}", (sx * 2.9, 0, -0.06), (0.2, 1.6, 0.24), p["concrete"], bevel=0.02)
-        kit.plate((sx * 2.9, 0, 0.065), (0.2, 1.6, 0.02), p["olive"])
+            rig.box(f"curb{sx}{sy}", (cx, sy * 0.9, -0.1), (w, 0.2, 0.2), p["concrete"], bevel=0.02)
+            kit.plate((cx, sy * 0.88, 0.012), (w, 0.16, 0.02), p["olive"], panels=4)
+            kit.hazard((cx, sy * 0.8, 0.02), (w - 0.1, 0.03, 0.03), stripes=int(w / 0.18))
+        rig.box(f"end_wall{sx}", (sx * 2.9, 0, -0.1), (0.2, 1.6, 0.2), p["concrete"], bevel=0.02)
+        kit.plate((sx * 2.88, 0, 0.012), (0.16, 1.6, 0.02), p["olive"])
     # funnel walls: riveted steel sloping down to the belt trough
     rig.mesh("funnel", [
         (-2.8, -0.8, 0), (2.8, -0.8, 0), (2.8, 0.8, 0), (-2.8, 0.8, 0),
@@ -170,6 +278,9 @@ def build():
     kit.reset()
     p = kit.palette()
     rig.layer("base")
+    ground()
+    apron(p)
+    haze(p)
     pit(p)
     extraction_belt(p)
     drive_house(p)

@@ -18,7 +18,10 @@ end
 
 -- Shift + right click on rolling stock or a train stop, then Shift + left click on a
 -- station copies the colour to the station.
-local windows = shared.station_window_names()
+local windows = {}
+for _, name in pairs(shared.station_window_names()) do
+  if data.raw.container[name] then windows[#windows + 1] = name end
+end
 for _, type in pairs({ "locomotive", "cargo-wagon", "fluid-wagon", "artillery-wagon", "train-stop" }) do
   for _, prototype in pairs(data.raw[type] or {}) do
     local list = prototype.additional_pastable_entities or {}

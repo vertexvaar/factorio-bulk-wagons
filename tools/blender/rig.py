@@ -571,8 +571,9 @@ def render_frames(out_dir, frames, orientation_of, passes=("color", "mask", "sha
     """Renders each frame index; orientation_of(i) gives the Factorio orientation (0..1, clockwise from north).
 
     Passes: color, mask, shadow, plus base/top which split the color pass into the
-    parts on the ground and the overhead parts (drawn above trains in game), and
-    base_mask/top_mask, their masks.
+    parts on the ground and the overhead parts (drawn above trains in game),
+    base_mask/top_mask, their masks, and top_static, the top without the parts
+    marked as moving (see mark_moving).
 
     pose(i), if given, is called before rendering frame i to set up animated parts.
     """
@@ -591,11 +592,14 @@ def render_frames(out_dir, frames, orientation_of, passes=("color", "mask", "sha
         for kind in passes:
             catcher.hide_render = kind != "shadow"
             part = kind[:-5] if kind.endswith("_mask") else kind
+            static = part == "top_static"
+            if static:
+                part = "top"
             for o in meshes:
                 if kind == "shadow":
                     o.visible_camera = False
                 elif part in ("base", "top"):
-                    o.visible_camera = _layer_of(o) == part
+                    o.visible_camera = _layer_of(o) == part and not (static and o.get("moving"))
                 elif kind == "hidden":
                     o.visible_camera = False
                 else:
@@ -604,7 +608,8 @@ def render_frames(out_dir, frames, orientation_of, passes=("color", "mask", "sha
                 if o.get("load"):
                     o.hide_render = kind != "load"
             is_mask = kind == "mask" or kind.endswith("_mask")
-            _set_paint_mode("mask" if is_mask else "grey" if kind in ("color", "base", "top") else None, white, holdout)
+            _set_paint_mode("mask" if is_mask else "grey" if kind in ("color", "base", "top", "top_static") else None,
+                            white, holdout)
             if kind == "load":
                 _set_load_mode(holdout)
             scene.cycles.samples = 4 if is_mask else {"shadow": 16, "load": 16}.get(kind, samples)
@@ -624,3 +629,10 @@ def rename(out_dir, src, dst, count):
             path = os.path.join(out_dir, f"{a}_{i:03d}.png")
             if os.path.exists(path):
                 os.replace(path, os.path.join(out_dir, f"{b}_{i:03d}.png"))
+
+
+def mark_moving(objects):
+    """Tags objects (and everything parented to them) as animated, left out of top_static."""
+    for obj in objects:
+        obj["moving"] = True
+        mark_moving(obj.children)

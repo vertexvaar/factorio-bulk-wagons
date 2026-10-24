@@ -9,7 +9,8 @@ at (2.5, -0.5). Variants 2-4 are the same model turned by 90 degree steps clockw
 
 Renders per variant: base, shadow, idle (spout up), extend_000..007 (spout lowers onto
 the wagon, played once) and work_000..007 (belt running, drive turning, spout down).
-Each comes with a *_mask twin for the station colour.
+Each comes with a *_mask twin for the station colour; top_static_000 is the idle top
+without its moving parts, for the window preview.
 """
 import math
 import os
@@ -213,7 +214,9 @@ def render_variant(out, v):
         o.hide_render = True
     set_spout(0)
     pose(0)
-    rig.render_frames(d, [0], lambda i: orient, passes=("base", "base_mask", "shadow", "top", "top_mask"), samples=32)
+    rig.mark_moving([obj for obj, _ in bellows] + [pivot for pivot, _ in spinning] + [m[0] for m in moving])
+    rig.render_frames(d, [0], lambda i: orient, passes=("base", "base_mask", "shadow", "top", "top_mask", "top_static"),
+                      samples=32)
     rig.rename(d, "top", "idle", 1)
     rig.render_frames(d, list(range(EXTEND_FRAMES)), lambda i: orient, passes=("top", "top_mask"), samples=32,
                       pose=lambda i: set_spout((i + 1) / EXTEND_FRAMES))

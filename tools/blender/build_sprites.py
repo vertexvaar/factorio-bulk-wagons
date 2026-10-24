@@ -87,9 +87,11 @@ def main(render_dir):
 
     src = os.path.join(render_dir, "w1")
     if os.path.isdir(src):
-        o = origin_of(src, 1.0)
-        meta["wagon"] = {kind: write_sheet(frames(src, kind, 128, 1.0), o, f"bulk-wagon-{kind}", 8, 4)
-                         for kind in ("color", "mask", "shadow", "load")}
+        # stretched like the buildings: on screen a tile of track is as long as it is
+        # wide, so only then does a north-south wagon reach its neighbours
+        o = origin_of(src, G)
+        meta["wagon"] = {kind: write_sheet(frames(src, kind, 128, G), o, f"bulk-wagon-{kind}", 8, 4)
+                         for kind in ("color", "mask", "shadow", "load1", "load2", "load3", "load4")}
 
     for key, layers in (
         ("b3", {"base": 1, "base_mask": 1, "shadow": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,

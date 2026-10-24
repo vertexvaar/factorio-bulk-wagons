@@ -4,8 +4,15 @@ Date: 2026-10-24
   Features:
     - Stations can be coloured: a colour panel next to the station window, or Shift + right click on a locomotive, wagon or train stop and Shift + left click on the station. Blueprints and copy-paste keep the colour.
     - Circuit panel: choose whether the wagon readings go out on the red and/or green network; the panel is laid out like the vanilla circuit window.
+    - The station window shows the station in its preview.
+    - The belt loader's window no longer shows a locked inventory slot.
+    - Loaded wagons show how full they are (four heap heights).
+    - Chutes, spouts and flap openers move down when a wagon arrives and up when it leaves; while goods move only the belts run.
+    - Portal silo: the port belt visibly runs into a hooded intake on the bucket elevator.
+    - Unloading pit: gravel apron with a ragged edge blends it into the ground; its insides are only hinted at.
     - Stations can only be built across a straight rail and snap to the rail grid like rail signals, so three fit side by side under one wagon.
   Changes:
+    - Wagon sprites are stretched onto the square tile grid like the buildings, so a north-south wagon reaches the cars next to it.
     - Stations collide with buildings, trees, rocks, rail signals and each other.
     - Transfer rate default is 250 items/s per station, moved in small steps every 12 ticks.
     - Colour masks of wagon and stations now work like the vanilla ones (grey paint under the mask, colour at alpha 0.5), so they look the same as a locomotive in the same colour.

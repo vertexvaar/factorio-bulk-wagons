@@ -7,7 +7,8 @@ Footprint for variant 1: 6 x 2 tiles, rail north-south through x in [-1, 1], por
 
 Renders per variant: base, shadow, idle (chute up), extend_000..007 (chute lowers onto
 the wagon, played once) and work_000..007 (elevator drive turning, chute down).
-Each comes with a *_mask twin for the station colour.
+Each comes with a *_mask twin for the station colour; top_static_000 is the idle top
+without its moving parts, for the window preview.
 """
 import math
 import os
@@ -123,10 +124,17 @@ def elevator(p):
     kit.footing(x, y, (0.7, 0.7), 0.16)
     rig.box("elev_boot", (x, y, 0.45), (0.62, 0.62, 0.6), p["red"], bevel=0.02)
     kit.rivets((x - 0.28, y - 0.32, 0.7), (x + 0.28, y - 0.32, 0.7), 6, (0, -1, 0))
-    rig.mesh("elev_hopper", [
-        (x - 0.3, y - 0.3, 0.75), (x + 0.45, y - 0.3, 0.75), (x + 0.45, y + 0.3, 0.75), (x - 0.3, y + 0.3, 0.75),
-        (x - 0.2, y - 0.2, 0.56), (x + 0.45, y - 0.2, 0.56), (x + 0.45, y + 0.2, 0.56), (x - 0.2, y + 0.2, 0.56),
-    ], [(0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], p["yellow"], bevel=0.01)
+    # belt intake: the port belt runs between skirt boards into a hood on the boot,
+    # behind rubber curtain strips, so the goods visibly go into the elevator
+    by = -0.5  # belt centre line (the port tile)
+    for s in (-1, 1):
+        rig.box(f"intake_skirt{s}", (2.9, by + s * 0.3, 0.12), (0.22, 0.04, 0.16), p["steel"], bevel=0.005)
+    rig.box("intake_hood_top", (2.92, by, 0.52), (0.3, 0.7, 0.05), p["red"], bevel=0.01)
+    kit.hazard((2.92, by, 0.555), (0.26, 0.62, 0.02), stripes=5, axis="y")
+    for s in (-1, 1):
+        rig.box(f"intake_hood_side{s}", (2.92, by + s * 0.34, 0.31), (0.3, 0.03, 0.4), p["red"], bevel=0.005)
+    for k in range(8):
+        rig.box(f"intake_curtain{k}", (3.05, by - 0.28 + k * 0.08, 0.32), (0.012, 0.07, 0.36), p["rubber"], bevel=0)
     for dx in (-0.12, 0.12):
         rig.box(f"elev_leg{dx}", (x + dx, y, 2.75), (0.2, 0.38, 4.0), p["olive"], bevel=0.01)
     for k in range(9):
@@ -134,7 +142,7 @@ def elevator(p):
         rig.box(f"elev_flange{k}", (x, y, z), (0.52, 0.44, 0.04), p["steel"], bevel=0.005)
         kit.rivets((x - 0.22, y - 0.225, z), (x + 0.22, y - 0.225, z), 4, (0, -1, 0))
     rig.box("elev_door", (x - 0.12, y - 0.2, 1.3), (0.16, 0.02, 0.3), p["dark"], bevel=0.004)
-    kit.ladder((x + 0.32, y, 0.15), (x + 0.32, y, 4.75), cage=True)
+    kit.ladder((x - 0.06, y + 0.32, 0.15), (x - 0.06, y + 0.32, 4.75), cage=True)  # north side, clear of the intake
     rig.layer("top")
     rig.box("elev_head", (x, y, 5.0), (0.64, 0.52, 0.52), p["red"], bevel=0.02)
     kit.rivets((x - 0.3, y - 0.27, 5.2), (x + 0.3, y - 0.27, 5.2), 6, (0, -1, 0))
@@ -180,7 +188,9 @@ def render_variant(out, v):
     orient = (v - 1) / 4
     set_chute(0)
     spin(0)
-    rig.render_frames(d, [0], lambda i: orient, passes=("base", "base_mask", "shadow", "top", "top_mask"), samples=32)
+    rig.mark_moving([obj for obj, _ in bellows] + [pivot for pivot, _ in spinning])
+    rig.render_frames(d, [0], lambda i: orient, passes=("base", "base_mask", "shadow", "top", "top_mask", "top_static"),
+                      samples=32)
     rig.rename(d, "top", "idle", 1)
     rig.render_frames(d, list(range(EXTEND_FRAMES)), lambda i: orient, passes=("top", "top_mask"), samples=32,
                       pose=lambda i: set_chute((i + 1) / EXTEND_FRAMES))

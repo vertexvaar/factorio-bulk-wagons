@@ -20,6 +20,42 @@ local walkable_mask =
 -- layer, rotates through its variants, shows in ghosts and blueprints). Stations with
 -- an inventory get a hidden container on top, created by the script, which takes
 -- the mouse (higher selection priority), the GUI, inserters and circuit wires.
+-- Hidden container that takes the mouse (higher selection priority), the GUI,
+-- inserters and circuit wires of a station. offset: its position relative to the
+-- station centre; its selection box still covers the whole station.
+local function window_entity(def, name, half_w, half_h, offset)
+  return {
+    type = "container",
+    name = name,
+    icon = def.icon,
+    flags = {
+      "placeable-neutral",
+      "player-creation",
+      "not-blueprintable",
+      "not-deconstructable",
+      "placeable-off-grid",
+    },
+    hidden = true,
+    localised_name = { "entity-name." .. def.name },
+    localised_description = { "entity-description." .. def.name },
+    placeable_by = { item = def.name, count = 1 },
+    minable = { mining_time = 0.5, result = def.name },
+    selection_priority = 60,
+    max_health = 500,
+    open_sound = sounds.metallic_chest_open,
+    close_sound = sounds.metallic_chest_close,
+    collision_box = { { -half_w + 0.1, -half_h + 0.1 }, { half_w - 0.1, half_h - 0.1 } },
+    selection_box = {
+      { -half_w - offset[1], -half_h - offset[2] },
+      { half_w - offset[1], half_h - offset[2] },
+    },
+    collision_mask = { layers = {} },
+    circuit_wire_max_distance = 9,
+    picture = util.empty_sprite(),
+    offset = offset, -- removed again before data:extend
+  }
+end
+
 local function station_variants(def)
   local prototypes = {}
   for _, planet in pairs(shared.active_planets(mods)) do
@@ -32,6 +68,13 @@ local function station_variants(def)
       end
 
       local picture = graphics.station_picture(def.sprite, variant, planet)
+        or {
+          filename = gfx .. def.placeholder .. "-" .. variant .. ".png",
+          width = vertical and 384 or 128,
+          height = vertical and 128 or 384,
+          scale = 0.5,
+          tint = shared.placeholder_tint[planet],
+        }
       prototypes[#prototypes + 1] = {
         type = "simple-entity-with-owner",
         name = name,
@@ -50,51 +93,42 @@ local function station_variants(def)
         -- signals in their slots, so three stations line up under one wagon
         build_grid_size = 2,
         render_layer = def.render_layer,
-        picture = picture or {
-          filename = gfx .. def.placeholder .. "-" .. variant .. ".png",
-          width = vertical and 384 or 128,
-          height = vertical and 128 or 384,
-          scale = 0.5,
-          tint = shared.placeholder_tint[planet],
-        },
+        picture = picture,
       }
+
+      -- the station's window: its inventory, or the belt loader's control box
+      local store
+      if def.inventory then
+        store = window_entity(def, shared.store_name(def.name, variant, planet), half_w, half_h, { 0, 0 })
+        store.inventory_size = math.max(1, math.floor(wagon_slots * def.inventory + 0.5))
+        store.inventory_type = "with_filters_and_bar"
+      else
+        local off = shared.rotate(shared.control_offset, variant)
+        store = window_entity(def, shared.control_name(variant, planet), half_w, half_h, off)
+        store.collision_box = { { -0.4, -0.4 }, { 0.4, 0.4 } }
+        -- nothing to store: the window only carries the preview, wires and panels
+        store.inventory_size = 0
+      end
+      store.integration_patch = graphics.preview_patch(picture, def.sprite, variant, planet, store.offset)
+      store.integration_patch_render_layer = def.render_layer
+      store.drawing_box_vertical_extension = def.preview_height
+      store.offset = nil
+      prototypes[#prototypes + 1] = store
     end
   end
 
   if def.inventory then
+    -- inventories of stations built before 0.3.0
     for _, vertical in pairs({ true, false }) do
       local half_w, half_h = 3, 1
       if not vertical then
         half_w, half_h = 1, 3
       end
-      prototypes[#prototypes + 1] = {
-        type = "container",
-        name = shared.store_name(def.name, vertical),
-        icon = def.icon,
-        flags = {
-          "placeable-neutral",
-          "player-creation",
-          "not-blueprintable",
-          "not-deconstructable",
-          "placeable-off-grid",
-        },
-        hidden = true,
-        localised_name = { "entity-name." .. def.name },
-        localised_description = { "entity-description." .. def.name },
-        placeable_by = { item = def.name, count = 1 },
-        minable = { mining_time = 0.5, result = def.name },
-        selection_priority = 60,
-        max_health = 500,
-        open_sound = sounds.metallic_chest_open,
-        close_sound = sounds.metallic_chest_close,
-        collision_box = { { -half_w + 0.1, -half_h + 0.1 }, { half_w - 0.1, half_h - 0.1 } },
-        selection_box = { { -half_w, -half_h }, { half_w, half_h } },
-        collision_mask = { layers = {} },
-        inventory_size = math.max(1, math.floor(wagon_slots * def.inventory + 0.5)),
-        inventory_type = "with_filters_and_bar",
-        circuit_wire_max_distance = 9,
-        picture = util.empty_sprite(),
-      }
+      local store = window_entity(def, shared.legacy_store_name(def.name, vertical), half_w, half_h, { 0, 0 })
+      store.inventory_size = math.max(1, math.floor(wagon_slots * def.inventory + 0.5))
+      store.inventory_type = "with_filters_and_bar"
+      store.offset = nil
+      prototypes[#prototypes + 1] = store
     end
   end
 
@@ -157,6 +191,7 @@ data:extend(station_variants({
   icon = "__bulk-wagons__/graphics/icons/belt-loader.png",
   sprite = "b3",
   placeholder = "belt-loader",
+  preview_height = 2,
   render_layer = "lower-object-above-shadow",
   order = "a[train-system]-z[bulk]-a[belt-loader]",
   ingredients = {
@@ -172,6 +207,7 @@ data:extend(station_variants({
   icon = "__bulk-wagons__/graphics/icons/loading-station.png",
   sprite = "b1",
   placeholder = "loading-station",
+  preview_height = 3.5,
   render_layer = "lower-object-above-shadow",
   order = "a[train-system]-z[bulk]-b[loading-station]",
   inventory = settings.startup["bulk-wagons-loader-multiplier"].value,
@@ -182,44 +218,6 @@ data:extend(station_variants({
     { type = "item", name = "fast-transport-belt", amount = 10 },
   },
 }))
-
--- Control boxes of the belt loader (see shared.control_name).
-for variant = 1, shared.variant_count do
-  local vertical = shared.rail_is_vertical(variant)
-  local off = shared.rotate(shared.control_offset, variant)
-  local half_w, half_h = 3, 1
-  if not vertical then
-    half_w, half_h = 1, 3
-  end
-  data:extend({
-    {
-      type = "container",
-      name = shared.control_name(variant),
-      icon = "__bulk-wagons__/graphics/icons/belt-loader.png",
-      flags = {
-        "placeable-neutral",
-        "player-creation",
-        "not-blueprintable",
-        "not-deconstructable",
-        "placeable-off-grid",
-      },
-      hidden = true,
-      localised_name = { "entity-name." .. shared.belt_loader },
-      localised_description = { "entity-description." .. shared.belt_loader },
-      placeable_by = { item = shared.belt_loader, count = 1 },
-      minable = { mining_time = 0.5, result = shared.belt_loader },
-      selection_priority = 60,
-      max_health = 500,
-      collision_box = { { -0.4, -0.4 }, { 0.4, 0.4 } },
-      selection_box = { { -half_w - off[1], -half_h - off[2] }, { half_w - off[1], half_h - off[2] } },
-      collision_mask = { layers = {} },
-      inventory_size = 1,
-      inventory_type = "with_filters_and_bar",
-      circuit_wire_max_distance = 9,
-      picture = util.empty_sprite(),
-    },
-  })
-end
 
 -- Hidden constant combinator wired to a station's inventory: carries the wagon readings.
 local signals = table.deepcopy(data.raw["constant-combinator"]["constant-combinator"])

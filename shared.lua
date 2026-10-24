@@ -44,13 +44,17 @@ shared.placeholder_tint = {
   aquilo = { 0.7, 0.9, 1 },
 }
 
--- Hidden inventory container of a station, one per rail direction.
-function shared.store_name(base, vertical) return base .. (vertical and "-store-v" or "-store-h") end
+-- Hidden inventory container of a station, one per variant and planet (it shows the
+-- station in the window preview).
+function shared.store_name(base, variant, planet) return with_planet(base, planet) .. "-store-" .. variant end
+
+-- Inventories of stations built before 0.3.0, one per rail direction.
+function shared.legacy_store_name(base, vertical) return base .. (vertical and "-store-v" or "-store-h") end
 
 -- The belt loader has no inventory; a small control box at its tower end carries the
 -- circuit connection and settings window (one per variant, its selection box covers
 -- the whole station). It sits away from the belt port so the port reaches the wagon.
-function shared.control_name(variant) return shared.belt_loader .. "-control-" .. variant end
+function shared.control_name(variant, planet) return with_planet(shared.belt_loader, planet) .. "-control-" .. variant end
 
 shared.control_offset = { -2.5, 0.5 } -- variant 1, rotated like the port
 
@@ -62,15 +66,20 @@ shared.collision_layer = "bulk_wagons_station"
 -- Hidden constant combinator that puts a station's wagon readings on its network.
 shared.signals = "bulk-station-signals"
 
--- Entities that open a station's window (its hidden inventory or control box).
+-- Entities that open a station's window (its hidden inventory or control box), for
+-- every planet; not all of them exist without Space Age.
 function shared.station_window_names()
   local names = {}
   for _, base in pairs({ shared.pit, shared.loader }) do
-    names[#names + 1] = shared.store_name(base, true)
-    names[#names + 1] = shared.store_name(base, false)
+    names[#names + 1] = shared.legacy_store_name(base, true)
+    names[#names + 1] = shared.legacy_store_name(base, false)
   end
-  for variant = 1, shared.variant_count do
-    names[#names + 1] = shared.control_name(variant)
+  for _, planet in pairs(shared.planets) do
+    for variant = 1, shared.variant_count do
+      names[#names + 1] = shared.store_name(shared.pit, variant, planet)
+      names[#names + 1] = shared.store_name(shared.loader, variant, planet)
+      names[#names + 1] = shared.control_name(variant, planet)
+    end
   end
   return names
 end

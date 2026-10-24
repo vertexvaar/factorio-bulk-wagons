@@ -189,11 +189,15 @@ local EXTEND_TICKS = 32 -- 8 frames at a quarter frame per tick
 -- Name and position of a station's hidden inventory (the belt loader's is a small
 -- control box without usable slots, see shared.control_name).
 local function store_spec(entity, info)
+  local name_of = info.base == shared.belt_loader and function(planet) return shared.control_name(info.variant, planet) end
+    or function(planet) return shared.store_name(info.base, info.variant, planet) end
+  -- without Space Age only the Nauvis one exists
+  local name = exists(name_of(info.planet)) and name_of(info.planet) or name_of(nil)
   if info.base == shared.belt_loader then
     local off = shared.rotate(shared.control_offset, info.variant)
-    return shared.control_name(info.variant), { entity.position.x + off[1], entity.position.y + off[2] }
+    return name, { entity.position.x + off[1], entity.position.y + off[2] }
   end
-  return shared.store_name(info.base, shared.rail_is_vertical(info.variant)), entity.position
+  return name, entity.position
 end
 
 local function create_store(entity, info)
@@ -208,7 +212,7 @@ local function create_store(entity, info)
   if store then
     store.destructible = false
     storage.store_owner[store.unit_number] = entity.unit_number
-    if info.base == shared.belt_loader then store.get_inventory(defines.inventory.chest).set_bar(1) end
+
   end
   return store
 end
@@ -251,27 +255,60 @@ local function draw_overlay(record, kind)
   end
 end
 
+-- Station states: "idle" (no wagon, chute up), "extend" (lowering onto a wagon that
+-- arrived, played once), "docked" (resting on the wagon), "work" (docked and moving
+-- goods: belts run) and "retract" (lifting again after the train left, played once).
+local function has_extend(record) return storage.has_extend[SPRITE_KEY[record.base] .. "-" .. record.variant] end
+
+local function show(record, state)
+  record.state = state
+  record.switch_at = nil
+  if (state == "extend" or state == "retract") and has_extend(record) then
+    record.switch_at = game.tick + EXTEND_TICKS
+  elseif state == "extend" then
+    state = "docked"
+  elseif state == "retract" then
+    state = "idle"
+  end
+  record.state = state
+  -- without the lowering animation there is no docked picture either
+  draw_overlay(record, state == "docked" and not has_extend(record) and "idle" or state)
+end
+
+local WORK_GRACE = 3 -- transfer passes without goods before the belts stop
+
+-- Moves the station towards what the wagon below needs.
+local function update_state(record, docked, working)
+  if working then
+    record.slack = 0
+  else
+    record.slack = (record.slack or 0) + 1
+    working = record.state == "work" and record.slack < WORK_GRACE
+  end
+  record.working = working
+  local state = record.state
+  if docked then
+    if state == "idle" or state == "retract" then
+      show(record, "extend")
+    elseif state == "docked" or state == "work" then
+      local want = working and "work" or "docked"
+      if state ~= want then show(record, want) end
+    end
+  elseif state == "docked" or state == "work" or state == "extend" then
+    show(record, "retract")
+  end
+end
+
 -- (Re)draws the colour mask over the station picture and the overlay of the current state.
 local function draw_station(record)
   destroy(record, "base_mask")
   local name = "bulk-" .. SPRITE_KEY[record.base] .. "-" .. record.variant .. "-base_mask"
   record.base_mask = draw(record, name, BASE_MASK_LAYER, colors.get(record), false)
-  draw_overlay(record, record.state == "work" and "work" or "idle")
-end
-
-local function set_state(record, state)
-  if record.state == state then return end
-  record.state = state
-  record.switch_at = nil
-  if state == "idle" then
-    draw_overlay(record, "idle")
-  elseif storage.has_extend[SPRITE_KEY[record.base] .. "-" .. record.variant] then
-    -- lower the chute (or raise the flap openers) first, then loop
-    draw_overlay(record, "extend")
-    record.switch_at = game.tick + EXTEND_TICKS
-  else
-    draw_overlay(record, "work")
-  end
+  -- a transition in progress is cut short
+  local state = record.state
+  if state == "extend" then state = "docked" end
+  if state == "retract" or not state then state = "idle" end
+  show(record, state)
 end
 
 local function register_station(entity, info)
@@ -284,7 +321,6 @@ local function register_station(entity, info)
   script.register_on_object_destroyed(entity)
   circuit.attach(record)
   if record.store then circuit.on_any_built(record.store) end
-  record.state = "idle"
   draw_station(record)
   return record
 end
@@ -430,17 +466,21 @@ local function find_wagon(record)
   end
 end
 
+-- Moves up to budget items; returns how many moved.
 local function move_items(from, to, budget, allowed)
+  local moved = 0
   for _, item in pairs(from.get_contents()) do
-    if budget <= 0 then return end
+    if moved >= budget then break end
     if not allowed or allowed[item.name] then
-      local inserted = to.insert({ name = item.name, count = math.min(item.count, budget), quality = item.quality })
+      local count = math.min(item.count, budget - moved)
+      local inserted = to.insert({ name = item.name, count = count, quality = item.quality })
       if inserted > 0 then
         from.remove({ name = item.name, count = inserted, quality = item.quality })
-        budget = budget - inserted
+        moved = moved + inserted
       end
     end
   end
+  return moved
 end
 
 local function port_busy(record)
@@ -467,24 +507,18 @@ local function transfer_pass()
         -- the port loads the wagon on its own; a disabled station stops its port
         if record.port and record.port.valid then record.port.disabled_by_script = not enabled end
         working = enabled and wagon ~= nil and port_busy(record)
-      elseif not enabled then
-        working = false
-      elseif store then
-        if wagon then
-          local wagon_inventory = wagon.get_inventory(defines.inventory.cargo_wagon)
-          if record.base == shared.pit then
-            move_items(wagon_inventory, store, budget, nil)
-          else
-            move_items(store, wagon_inventory, budget, storage.allowed)
-          end
-        end
+      elseif enabled and store and wagon then
+        local wagon_inventory = wagon.get_inventory(defines.inventory.cargo_wagon)
+        local moved
         if record.base == shared.pit then
-          working = not store.is_empty()
+          moved = move_items(wagon_inventory, store, budget, nil)
         else
-          working = wagon ~= nil and not store.is_empty()
+          moved = move_items(store, wagon_inventory, budget, storage.allowed)
         end
+        -- the pit's extraction belt runs on while it has goods
+        working = moved > 0 or record.base == shared.pit and not store.is_empty()
       end
-      set_state(record, working and "work" or "idle")
+      update_state(record, wagon ~= nil, working)
     end
   end
 end
@@ -492,8 +526,11 @@ end
 local function finish_transitions()
   for _, record in pairs(storage.stations) do
     if record.switch_at and game.tick >= record.switch_at and record.entity.valid then
-      record.switch_at = nil
-      draw_overlay(record, "work")
+      if record.state == "extend" then
+        show(record, record.working and "work" or "docked")
+      else
+        show(record, "idle")
+      end
     end
   end
 end
@@ -682,7 +719,8 @@ end
 --------------------------------------------------------------------------------
 -- Visible cargo: heaps in the wagon, tinted like the ore it carries
 
-local LOAD_ANIMATION = "bulk-wagon-load"
+local LOAD_ANIMATION = "bulk-wagon-load-" -- .. fill level 1 to 4
+local LOAD_LEVELS = 4
 local LOAD_FRAMES = 128 -- frame i shows orientation i / 256, back equals front
 local CARGO_COLORS = {
   ["iron-ore"] = { 0.55, 0.62, 0.75 },
@@ -728,11 +766,14 @@ local function update_cargo(wagon)
   end
   local color = CARGO_COLORS[top] or DEFAULT_CARGO_COLOR
   local frame = load_frame(wagon)
+  -- fill level from the share of used slots: any goods show at least a quarter
+  local used = #inventory - inventory.count_empty_stacks()
+  local level = math.max(1, math.min(LOAD_LEVELS, math.ceil(used / #inventory * LOAD_LEVELS)))
   if not (record and record.render.valid) then
     record = {
       wagon = wagon,
       render = rendering.draw_animation({
-        animation = LOAD_ANIMATION,
+        animation = LOAD_ANIMATION .. level,
         surface = wagon.surface,
         target = wagon,
         render_layer = "cargo-hatch",
@@ -742,9 +783,14 @@ local function update_cargo(wagon)
       }),
       frame = frame,
       item = top,
+      level = level,
     }
     storage.cargo[unit] = record
     return
+  end
+  if record.level ~= level then
+    record.render.animation = LOAD_ANIMATION .. level
+    record.level = level
   end
   if record.frame ~= frame then
     record.render.animation_offset = frame

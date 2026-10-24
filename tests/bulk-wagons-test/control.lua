@@ -123,7 +123,7 @@ local function setup()
   station_inv.insert({ name = "iron-plate", count = 5 })
   s.in_belts = belt_run(surface, { 30.5, -13.5 }, { -1, 0 }, 7, defines.direction.west)
   -- circuit wire from the station's inventory to a constant combinator
-  s.store_b = surface.find_entities_filtered({ name = "bulk-loading-station-store-v", position = { 21, -13 } })[1]
+  s.store_b = surface.find_entities_filtered({ name = "bulk-loading-station-store-1", position = { 21, -13 } })[1]
   s.combinator = surface.create_entity({ name = "constant-combinator", position = { 25.5, -10.5 }, force = "player" })
   local connected = s.store_b and s.store_b.get_wire_connector(defines.wire_connector_id.circuit_red, true)
     .connect_to(s.combinator.get_wire_connector(defines.wire_connector_id.circuit_red, true))
@@ -199,7 +199,7 @@ local function setup()
     and s.aligned.position.x == 7 and s.aligned.position.y == 31, "station turns and centres on rail",
     s.aligned and s.aligned.valid and (s.aligned.name .. " at " .. s.aligned.position.x .. "," .. s.aligned.position.y) or "gone")
   local ports = surface.find_entities_filtered({ name = "bulk-station-port", area = { { 4, 28 }, { 10, 36 } } })
-  report(#ports == 1 and ports[1].loader_container ~= nil and ports[1].loader_container.name == "bulk-loading-station-store-h", "aligned station has its port", #ports .. " ports")
+  report(#ports == 1 and ports[1].loader_container ~= nil and ports[1].loader_container.name == "bulk-loading-station-store-2", "aligned station has its port", #ports .. " ports")
 
   -- Scene F: placement. Stations go across the track, three in a row, but not onto buildings.
   local row = {}

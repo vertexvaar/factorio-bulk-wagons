@@ -2,6 +2,7 @@
 
 Run:  blender -b --factory-startup -P tools/blender/wagon_w1.py -- <out_dir> [frames...]
 Frames are 0..127, frame i shows orientation i/256 (back equals front).
+The cargo heaps are rendered at four fill levels: load1_* (a quarter full) to load4_* (full).
 The wheels are not modelled: Factorio draws its standard train wheels on top.
 """
 import math
@@ -27,6 +28,9 @@ END_Y = 3.2  # headstock
 EDGES = (-TOP_HALF_LEN, -TOP_HALF_LEN / 3, TOP_HALF_LEN / 3, TOP_HALF_LEN)
 BAYS = tuple((EDGES[i] + EDGES[i + 1]) / 2 for i in range(3))
 BAY_HALF = TOP_HALF_LEN / 3
+# how far the heaps sink per fill level, from a quarter full to full; low heaps
+# disappear into the funnels, whose walls hide what sticks through them
+LOAD_DROPS = (0.6, 0.4, 0.2, 0.0)
 
 
 def materials(planet="nauvis"):
@@ -208,6 +212,9 @@ def ends(m):
     rig.cylinder("brake_spindle", (0.55, -2.9, SILL), (0.55, -2.9, SILL + 0.4), 0.015, m["dark"])
 
 
+heaps = []
+
+
 def cargo(m):
     """Heaps of loose goods, one per compartment. Rendered as their own grey layer that the
     game tints in the colour of the loaded ore and shows while the wagon is not empty."""
@@ -238,6 +245,7 @@ def cargo(m):
             disp.strength = strength
             disp.direction = "Z"
         heap["load"] = True
+        heaps.append(heap)
         for poly in heap.data.polygons:
             poly.use_smooth = True
 
@@ -259,4 +267,10 @@ if __name__ == "__main__":
     out = a[0]
     frames = [int(x) for x in a[1:]] or list(range(128))
     build()
-    rig.render_frames(out, frames, lambda i: i / 256, passes=("color", "mask", "shadow", "load"), samples=32)
+    rig.render_frames(out, frames, lambda i: i / 256, passes=("color", "mask", "shadow"), samples=32)
+    for level, drop in enumerate(LOAD_DROPS, start=1):
+        for heap in heaps:
+            heap.location.z = -drop
+        rig.render_frames(out, frames, lambda i: i / 256, passes=("load",), samples=32)
+        for i in frames:
+            os.replace(os.path.join(out, f"load_{i:03d}.png"), os.path.join(out, f"load{level}_{i:03d}.png"))

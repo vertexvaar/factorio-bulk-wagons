@@ -22,8 +22,9 @@ MASK_LEVEL = 0.5
 TINT_ALPHA = 0.5
 
 
-# Buildings sit on the square tile grid, so their renders are stretched vertically
-# until the ground footprint is square again (rolling stock is not, like vanilla).
+# Everything sits on the square tile grid, so the renders are stretched vertically
+# until the ground footprint is square again (rolling stock too, or a north-south
+# wagon comes out too short to reach the next one).
 GROUND_STRETCH = 1 / math.sin(math.radians(50))
 
 

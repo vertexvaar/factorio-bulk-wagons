@@ -53,21 +53,52 @@ function graphics.station_picture(key, variant, planet)
   return sheet(set.idle, { tint = tint })
 end
 
+-- The station as it stands idle (ground parts plus the overhead parts that do not
+-- move), for the hidden inventory, whose window preview would show nothing otherwise.
+-- offset: where that inventory sits relative to the station centre.
+function graphics.preview_patch(picture, key, variant, planet, offset)
+  local layers = {}
+  for _, layer in pairs(picture.layers or { picture }) do
+    if not layer.draw_as_shadow then layers[#layers + 1] = table.deepcopy(layer) end
+  end
+  local set = sprites[key .. "-" .. variant]
+  if set and set.top_static then layers[#layers + 1] = sheet(set.top_static, { tint = tint_for(planet) }) end
+  for _, layer in pairs(layers) do
+    local shift = layer.shift or { 0, 0 }
+    layer.shift = { (shift[1] or shift.x) - offset[1], (shift[2] or shift.y) - offset[2] }
+  end
+  return { layers = layers }
+end
+
 -- Sprite and animation prototypes the script draws on top of stations:
--- bulk-<key>-<variant>-idle, -work (looping) and -extend (played once), each with
--- a _mask twin in the station colour, plus -base_mask over the station picture.
+-- bulk-<key>-<variant>-idle, -work (looping), -extend and -retract (played once) and
+-- -docked (the last extend frame), each with a _mask twin in the station colour, plus
+-- -base_mask over the station picture.
 function graphics.station_overlays()
   local prototypes = {}
+  local function animation(name, meta, sequence)
+    prototypes[#prototypes + 1] = {
+      type = "animation",
+      name = name,
+      layers = {
+        sheet(meta, { frame_count = meta.frame_count, frame_sequence = sequence, animation_speed = 0.25 }),
+      },
+    }
+  end
   for name, set in pairs(sprites) do
     if name ~= "wagon" then
       for kind, meta in pairs(set) do
-        if kind ~= "base" and kind ~= "shadow" then
+        if kind ~= "base" and kind ~= "shadow" and kind ~= "top_static" then
           if meta.frame_count > 1 then
-            prototypes[#prototypes + 1] = {
-              type = "animation",
-              name = "bulk-" .. name .. "-" .. kind,
-              layers = { sheet(meta, { frame_count = meta.frame_count, animation_speed = 0.25 }) },
-            }
+            animation("bulk-" .. name .. "-" .. kind, meta)
+            if kind:find("^extend") then
+              local reversed = {}
+              for i = meta.frame_count, 1, -1 do
+                reversed[#reversed + 1] = i
+              end
+              animation("bulk-" .. name .. "-" .. kind:gsub("^extend", "retract"), meta, reversed)
+              animation("bulk-" .. name .. "-" .. kind:gsub("^extend", "docked"), meta, { meta.frame_count })
+            end
           else
             prototypes[#prototypes + 1] =
               { type = "sprite", name = "bulk-" .. name .. "-" .. kind, layers = { sheet(meta) } }
@@ -79,17 +110,20 @@ function graphics.station_overlays()
   if #prototypes > 0 then data:extend(prototypes) end
 end
 
--- Cargo heaps, drawn by the script on loaded wagons; one frame per direction.
+-- Cargo heaps, drawn by the script on loaded wagons: bulk-wagon-load-1 (a quarter
+-- full) to -4 (full), one frame per direction.
 function graphics.wagon_load()
   local set = sprites.wagon
-  if not (set and set.load) then return end
-  data:extend({
-    {
-      type = "animation",
-      name = "bulk-wagon-load",
-      layers = { sheet(set.load, { frame_count = 128 }) },
-    },
-  })
+  if not (set and set.load4) then return end
+  for level = 1, 4 do
+    data:extend({
+      {
+        type = "animation",
+        name = "bulk-wagon-load-" .. level,
+        layers = { sheet(set["load" .. level], { frame_count = 128 }) },
+      },
+    })
+  end
 end
 
 -- Tells the script which generated graphics exist (call once, at the end of the data stage).
@@ -102,7 +136,7 @@ function graphics.publish()
     {
       type = "mod-data",
       name = "bulk-wagons-graphics",
-      data = { load = sprites.wagon ~= nil and sprites.wagon.load ~= nil, extend = extend },
+      data = { load = sprites.wagon ~= nil and sprites.wagon.load4 ~= nil, extend = extend },
     },
   })
 end
