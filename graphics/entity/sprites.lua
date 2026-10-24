@@ -31,11 +31,11 @@ return {
     ["load"] = {
       ["files"] = { "bulk-wagon-load-1.png", "bulk-wagon-load-2.png", "bulk-wagon-load-3.png", "bulk-wagon-load-4.png" },
       ["width"] = 359,
-      ["height"] = 269,
+      ["height"] = 286,
       ["line_length"] = 8,
       ["lines_per_file"] = 4,
       ["frame_count"] = 128,
-      ["shift"] = { -0.0078, -1.4016 }
+      ["shift"] = { -0.0078, -0.9094 }
     }
   },
   ["b3-1"] = {

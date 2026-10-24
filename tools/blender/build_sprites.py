@@ -19,6 +19,11 @@ STATION_COLOR = (0.45, 0.5, 0.22)
 # wagon along the track, so a straight wagon would sit low between its neighbours
 # (in game it measured ~0.33 tiles too far from the train ahead).
 WAGON_LIFT = 0.33
+# The game projects the wagon's sprite shift with its orientation, the script-drawn
+# heaps are not projected. Measured on north-south track the heap sat 0.55 tiles
+# too high and 7 % too short in the hopper; east-west it fits.
+HEAP_DROP = 0.55
+HEAP_STRETCH = 0.07
 
 
 def frames(src, kind, count, stretch):
@@ -33,6 +38,24 @@ def lifted(images, lift):
         dy = round(lift * 64 * math.cos(2 * math.pi * i / (2 * len(images))) ** 2)
         moved = Image.new("RGBA", im.size)
         moved.paste(im, (0, -dy))
+        out.append(moved)
+    return out
+
+
+def heap_fit(images, drop, stretch):
+    """Moves each heap frame down and stretches it along the track, scaled like lifted()."""
+    from PIL import Image
+    out = []
+    for i, im in enumerate(images):
+        k = math.cos(2 * math.pi * i / (2 * len(images))) ** 2
+        box = im.getbbox()
+        moved = Image.new("RGBA", im.size)
+        if box:
+            part = im.crop(box)
+            h = round(part.height * (1 + stretch * k))
+            part = part.resize((part.width, h), Image.LANCZOS)
+            top = round((box[1] + box[3]) / 2 - h / 2 + drop * 64 * k)
+            moved.paste(part, (box[0], top))
         out.append(moved)
     return out
 
@@ -103,8 +126,12 @@ def main(render_dir):
     src = os.path.join(render_dir, "w1")
     if os.path.isdir(src):
         o = origin_of(src, 1.0)
-        meta["wagon"] = {kind: write_sheet(lifted(frames(src, kind, 128, 1.0), WAGON_LIFT), o, f"bulk-wagon-{kind}", 8, 4)
-                         for kind in ("color", "mask", "shadow", "load1", "load2", "load3", "load4")}
+        meta["wagon"] = {}
+        for kind in ("color", "mask", "shadow", "load1", "load2", "load3", "load4"):
+            images = lifted(frames(src, kind, 128, 1.0), WAGON_LIFT)
+            if kind.startswith("load"):
+                images = heap_fit(images, HEAP_DROP, HEAP_STRETCH)
+            meta["wagon"][kind] = write_sheet(images, o, f"bulk-wagon-{kind}", 8, 4)
 
     for key, layers in (
         ("b3", {"base": 1, "base_mask": 1, "shadow": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,
