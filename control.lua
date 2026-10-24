@@ -681,7 +681,9 @@ local function on_gui_opened(event)
     if record then
       local player = game.get_player(event.player_index)
       circuit.open_panel(player, record)
-      colors.open_panel(player, record)
+      -- only graphics with colour masks can show a station colour
+      local mask = "bulk-" .. SPRITE_KEY[record.base] .. "-" .. record.variant .. "-idle_mask"
+      if helpers.is_valid_sprite_path(mask) then colors.open_panel(player, record) end
     end
   end
 end

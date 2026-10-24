@@ -111,16 +111,17 @@ function graphics.station_overlays()
 end
 
 -- Cargo heaps, drawn by the script on loaded wagons: bulk-wagon-load-1 (a quarter
--- full) to -4 (full), one frame per direction.
+-- full) to -4 (full), one frame per direction. Older renders have a single heap
+-- (load), used for every level.
 function graphics.wagon_load()
   local set = sprites.wagon
-  if not (set and set.load4) then return end
+  if not (set and (set.load4 or set.load)) then return end
   for level = 1, 4 do
     data:extend({
       {
         type = "animation",
         name = "bulk-wagon-load-" .. level,
-        layers = { sheet(set["load" .. level], { frame_count = 128 }) },
+        layers = { sheet(set["load" .. level] or set.load, { frame_count = 128 }) },
       },
     })
   end
@@ -136,7 +137,10 @@ function graphics.publish()
     {
       type = "mod-data",
       name = "bulk-wagons-graphics",
-      data = { load = sprites.wagon ~= nil and sprites.wagon.load4 ~= nil, extend = extend },
+      data = {
+        load = sprites.wagon ~= nil and (sprites.wagon.load4 or sprites.wagon.load) ~= nil,
+        extend = extend,
+      },
     },
   })
 end
