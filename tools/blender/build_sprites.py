@@ -134,9 +134,9 @@ def main(render_dir):
             meta["wagon"][kind] = write_sheet(images, o, f"bulk-wagon-{kind}", 8, 4)
 
     for key, layers in (
-        ("b3", {"base": 1, "base_mask": 1, "shadow": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,
+        ("b3", {"base": 1, "base_mask": 1, "shadow": 1, "top_static": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,
                 "work": 8, "work_mask": 8}),
-        ("b1", {"base": 1, "base_mask": 1, "shadow": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,
+        ("b1", {"base": 1, "base_mask": 1, "shadow": 1, "top_static": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,
                 "work": 8, "work_mask": 8}),
         ("e1", {"idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8, "work": 8, "work_mask": 8}),
     ):
