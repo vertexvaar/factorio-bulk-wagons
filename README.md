@@ -6,7 +6,6 @@ Factorio 2.1 mod (Space Age optional) that adds a bulk wagon for ores and other 
 - **Unloading pit** (6 × 2 tiles, across the rail): empties stopped bulk wagons above it into its inventory. Its grate is walkable. Items leave through the built-in belt port or via inserters.
 - **Belt loader** (6 × 2 tiles, across the rail, first research): no inventory, loads stopped bulk wagons straight from the connected belt at that belt's speed.
 - **Portal silo loading station** (6 × 2 tiles, across the rail, second research): fills stopped bulk wagons below it from its inventory, fed by the built-in belt port or inserters.
-- Stations are colourable like the wagon: colour panel next to the station window, or copy the colour from a locomotive, wagon or train stop with Shift + right/left click. The masks work like the vanilla ones, so a station in the train's colour matches it.
 - Every Space Age planet gets its own look for wagon and stations; the right variant is placed automatically, the item stays the same.
 - Circuit network: station contents are readable; a panel next to the station window adds an enable/disable condition, reading the docked wagon's contents and a wagon docked signal (W = 1). Blueprints keep settings and wires.
 - One station per compartment, like pumps at a fluid wagon. Stations can only be built across a straight rail, snap to the rail grid like rail signals (three side by side per wagon) and collide with buildings; press R while placing to switch the port side.

@@ -849,9 +849,6 @@ local function rescan()
   for _, surface in pairs(game.surfaces) do
     for _, wagon in pairs(surface.find_entities_filtered({ name = wagon_names })) do
       storage.wagons[wagon.unit_number] = wagon
-      -- wagons from 0.2.0 were coloured at full alpha; the masks are made for 0.5
-      local c = wagon.color
-      if c and c.a and c.a > 0.5 then wagon.color = { r = c.r, g = c.g, b = c.b, a = 0.5 } end
     end
     for _, station in pairs(surface.find_entities_filtered({ name = names })) do
       local info = variant_of[station.name]
