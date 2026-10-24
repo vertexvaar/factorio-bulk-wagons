@@ -93,6 +93,15 @@ return {
       ["frame_count"] = 1,
       ["shift"] = { 0.0000, -2.3533 }
     },
+    ["top_static"] = {
+      ["files"] = { "b3-1-top_static.png" },
+      ["width"] = 333,
+      ["height"] = 269,
+      ["line_length"] = 1,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 1,
+      ["shift"] = { -0.1172, -1.4315 }
+    },
     ["idle"] = {
       ["files"] = { "b3-1-idle.png" },
       ["width"] = 333,
@@ -175,6 +184,15 @@ return {
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
       ["shift"] = { 0.0000, -2.3533 }
+    },
+    ["top_static"] = {
+      ["files"] = { "b3-2-top_static.png" },
+      ["width"] = 124,
+      ["height"] = 517,
+      ["line_length"] = 1,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 1,
+      ["shift"] = { -0.0625, -1.2908 }
     },
     ["idle"] = {
       ["files"] = { "b3-2-idle.png" },
@@ -259,6 +277,15 @@ return {
       ["frame_count"] = 1,
       ["shift"] = { 0.0000, -2.3533 }
     },
+    ["top_static"] = {
+      ["files"] = { "b3-3-top_static.png" },
+      ["width"] = 333,
+      ["height"] = 226,
+      ["line_length"] = 1,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 1,
+      ["shift"] = { 0.1172, -1.8611 }
+    },
     ["idle"] = {
       ["files"] = { "b3-3-idle.png" },
       ["width"] = 333,
@@ -341,6 +368,15 @@ return {
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
       ["shift"] = { 0.0000, -2.3533 }
+    },
+    ["top_static"] = {
+      ["files"] = { "b3-4-top_static.png" },
+      ["width"] = 124,
+      ["height"] = 385,
+      ["line_length"] = 1,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 1,
+      ["shift"] = { 0.0625, -0.1658 }
     },
     ["idle"] = {
       ["files"] = { "b3-4-idle.png" },
@@ -425,6 +461,15 @@ return {
       ["frame_count"] = 1,
       ["shift"] = { 0.0000, -3.2636 }
     },
+    ["top_static"] = {
+      ["files"] = { "b1-1-top_static.png" },
+      ["width"] = 330,
+      ["height"] = 241,
+      ["line_length"] = 1,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 1,
+      ["shift"] = { 0.3906, -3.3261 }
+    },
     ["idle"] = {
       ["files"] = { "b1-1-idle.png" },
       ["width"] = 330,
@@ -507,6 +552,15 @@ return {
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
       ["shift"] = { 0.0000, -3.2636 }
+    },
+    ["top_static"] = {
+      ["files"] = { "b1-2-top_static.png" },
+      ["width"] = 133,
+      ["height"] = 543,
+      ["line_length"] = 1,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 1,
+      ["shift"] = { 0.0234, -1.2479 }
     },
     ["idle"] = {
       ["files"] = { "b1-2-idle.png" },
@@ -591,6 +645,15 @@ return {
       ["frame_count"] = 1,
       ["shift"] = { 0.0000, -3.2636 }
     },
+    ["top_static"] = {
+      ["files"] = { "b1-3-top_static.png" },
+      ["width"] = 330,
+      ["height"] = 254,
+      ["line_length"] = 1,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 1,
+      ["shift"] = { -0.3906, -3.4276 }
+    },
     ["idle"] = {
       ["files"] = { "b1-3-idle.png" },
       ["width"] = 330,
@@ -673,6 +736,15 @@ return {
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
       ["shift"] = { 0.0000, -3.2636 }
+    },
+    ["top_static"] = {
+      ["files"] = { "b1-4-top_static.png" },
+      ["width"] = 133,
+      ["height"] = 626,
+      ["line_length"] = 1,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 1,
+      ["shift"] = { -0.0234, -2.4120 }
     },
     ["idle"] = {
       ["files"] = { "b1-4-idle.png" },
