@@ -15,11 +15,26 @@ OUT = os.path.join(ROOT, "graphics", "entity")
 # default colours, as in prototypes/wagon.lua and shared.station_color
 WAGON_COLOR = (0.56, 0.23, 0.15)
 STATION_COLOR = (0.45, 0.5, 0.22)
-
+# Lift of the north/south frames in tiles. The orthographic camera shortens the
+# wagon along the track, so a straight wagon would sit low between its neighbours
+# (in game it measured ~0.33 tiles too far from the train ahead).
+WAGON_LIFT = 0.33
 
 
 def frames(src, kind, count, stretch):
     return [pack.load(src, kind, i, stretch) for i in range(count)]
+
+
+def lifted(images, lift):
+    """Moves each wagon frame up by lift tiles, scaled by how much it faces north/south."""
+    from PIL import Image
+    out = []
+    for i, im in enumerate(images):
+        dy = round(lift * 64 * math.cos(2 * math.pi * i / (2 * len(images))) ** 2)
+        moved = Image.new("RGBA", im.size)
+        moved.paste(im, (0, -dy))
+        out.append(moved)
+    return out
 
 
 def write_sheet(images, origin, name, line_length, lines_per_file=None):
@@ -88,7 +103,7 @@ def main(render_dir):
     src = os.path.join(render_dir, "w1")
     if os.path.isdir(src):
         o = origin_of(src, 1.0)
-        meta["wagon"] = {kind: write_sheet(frames(src, kind, 128, 1.0), o, f"bulk-wagon-{kind}", 8, 4)
+        meta["wagon"] = {kind: write_sheet(lifted(frames(src, kind, 128, 1.0), WAGON_LIFT), o, f"bulk-wagon-{kind}", 8, 4)
                          for kind in ("color", "mask", "shadow", "load1", "load2", "load3", "load4")}
 
     for key, layers in (

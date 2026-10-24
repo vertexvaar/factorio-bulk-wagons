@@ -8,34 +8,34 @@ return {
       ["line_length"] = 8,
       ["lines_per_file"] = 4,
       ["frame_count"] = 128,
-      ["shift"] = { 0.0000, -0.6750 }
+      ["shift"] = { 0.0000, -1.0031 }
     },
     ["mask"] = {
       ["files"] = { "bulk-wagon-mask-1.png", "bulk-wagon-mask-2.png", "bulk-wagon-mask-3.png", "bulk-wagon-mask-4.png" },
       ["width"] = 384,
-      ["height"] = 342,
+      ["height"] = 343,
       ["line_length"] = 8,
       ["lines_per_file"] = 4,
       ["frame_count"] = 128,
-      ["shift"] = { 0.0000, -0.8937 }
+      ["shift"] = { 0.0000, -1.1984 }
     },
     ["shadow"] = {
       ["files"] = { "bulk-wagon-shadow-1.png", "bulk-wagon-shadow-2.png", "bulk-wagon-shadow-3.png", "bulk-wagon-shadow-4.png" },
       ["width"] = 512,
-      ["height"] = 576,
+      ["height"] = 597,
       ["line_length"] = 8,
       ["lines_per_file"] = 4,
       ["frame_count"] = 128,
-      ["shift"] = { 0.0000, -1.3000 }
+      ["shift"] = { 0.0000, -1.4641 }
     },
     ["load"] = {
       ["files"] = { "bulk-wagon-load-1.png", "bulk-wagon-load-2.png", "bulk-wagon-load-3.png", "bulk-wagon-load-4.png" },
       ["width"] = 359,
-      ["height"] = 267,
+      ["height"] = 269,
       ["line_length"] = 8,
       ["lines_per_file"] = 4,
       ["frame_count"] = 128,
-      ["shift"] = { -0.0078, -1.1047 }
+      ["shift"] = { -0.0078, -1.4016 }
     }
   },
   ["b3-1"] = {
