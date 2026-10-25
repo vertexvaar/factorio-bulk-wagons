@@ -337,6 +337,12 @@ script.on_event(defines.events.on_tick, function(event)
   end
   local age = game.tick - storage.start
   if age < 400 then feed() end
+  -- a wagon over a working pit shows its heaps draining through the open flaps
+  if not storage.saw_drain and age < 400 then
+    for _, object in pairs(rendering.get_all_objects("bulk-wagons")) do
+      if object.type == "animation" and object.animation:find("^bulk%-wagon%-drain%-") then storage.saw_drain = true end
+    end
+  end
   if age == 40 then check_moving() end
   if age == 60 then
     local red = defines.wire_connector_id.circuit_red
@@ -352,8 +358,26 @@ script.on_event(defines.events.on_tick, function(event)
     local section = s.cc_g.get_or_create_control_behavior().get_section(1)
     section.set_slot(1, { value = { type = "virtual", name = "signal-A", quality = "normal", comparator = "=" }, min = 1 })
   end
+  if age == 1 then
+    -- stations side by side along the track, as a player places them
+    local surface = game.surfaces.nauvis
+    for i, base in pairs({ "bulk-belt-loader", "bulk-loading-station", "bulk-unloading-pit" }) do
+      local x = 61 + 10 * i
+      for y = -9, 9, 2 do
+        surface.create_entity({ name = "straight-rail", position = { x, y }, direction = defines.direction.north, force = "player" })
+      end
+      surface.create_entity({ name = base, position = { x, 0 }, force = "player", raise_built = true })
+      local function fits(dy)
+        return surface.can_place_entity({ name = base, position = { x, dy }, force = "player",
+          build_check_type = defines.build_check_type.manual })
+      end
+      report(fits(2) and fits(-2) and fits(3) and not fits(1), base .. " fits right next to another on the 1-tile grid")
+    end
+  end
   if age == 600 then
     check()
+    report(storage.saw_drain == true, "unloading wagon shows draining heaps")
+    report(helpers.is_valid_sprite_path("utility/rail_signal_placement_indicator"), "placement indicator sprite exists")
     log("BULKTEST DONE")
   end
 end)

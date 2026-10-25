@@ -112,16 +112,23 @@ end
 
 -- Cargo heaps, drawn by the script on loaded wagons: bulk-wagon-load-1 (a quarter
 -- full) to -4 (full), one frame per direction. Older renders have a single heap
--- (load), used for every level.
+-- (load), used for every level. bulk-wagon-drain-1 to -4 show the same levels while
+-- a pit unloads the wagon through its open flaps; without them the load heaps stand in.
 function graphics.wagon_load()
   local set = sprites.wagon
   if not (set and (set.load4 or set.load)) then return end
   for level = 1, 4 do
+    local load = set["load" .. level] or set.load
     data:extend({
       {
         type = "animation",
         name = "bulk-wagon-load-" .. level,
-        layers = { sheet(set["load" .. level] or set.load, { frame_count = 128 }) },
+        layers = { sheet(load, { frame_count = 128 }) },
+      },
+      {
+        type = "animation",
+        name = "bulk-wagon-drain-" .. level,
+        layers = { sheet(set["drain" .. level] or load, { frame_count = 128 }) },
       },
     })
   end

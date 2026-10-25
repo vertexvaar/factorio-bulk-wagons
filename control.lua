@@ -63,6 +63,7 @@ local function init_storage()
   storage.store_owner = storage.store_owner or {} -- store unit_number -> station unit_number
   storage.pending_wires = storage.pending_wires or {} -- position key -> wires waiting for an entity
   storage.cargo = storage.cargo or {} -- wagon unit_number -> { wagon, render, frame, item }
+  storage.drained = storage.drained or {} -- wagon unit_number -> tick a pit last took goods out
   storage.ghost_checks = storage.ghost_checks or {} -- station ghosts placed by hand, checked next tick
   -- the data stage reports which generated graphics exist
   local info = prototypes.mod_data["bulk-wagons-graphics"]
@@ -406,8 +407,9 @@ local function replace(entity, params)
 end
 
 -- Picks the station variant for the planet it stands on. A station built by
--- hand (align) also turns and centres itself on the rail below it: onto the centre of
--- a rail piece, like a rail signal in its slot, so three stations line up under a wagon.
+-- hand (align) also turns and centres itself across the rail below it; along the
+-- rail it keeps the 1-tile grid, like a rail signal, so three stations line up under
+-- every wagon of a train.
 local function fit_station(entity, info, align)
   local variant = info.variant
   local position = { entity.position.x, entity.position.y }
@@ -415,7 +417,11 @@ local function fit_station(entity, info, align)
     local rail, vertical = straight_rail_at(entity.surface, entity.position)
     if rail then
       if vertical ~= shared.rail_is_vertical(variant) then variant = variant % shared.variant_count + 1 end
-      position = { rail.position.x, rail.position.y }
+      if vertical then
+        position = { rail.position.x, math.floor(entity.position.y + 0.5) }
+      else
+        position = { math.floor(entity.position.x + 0.5), rail.position.y }
+      end
     end
   end
   local name = shared.variant_name(info.base, variant, planet_of(entity.surface))
@@ -510,6 +516,7 @@ local function transfer_pass()
         local moved
         if record.base == shared.pit then
           moved = move_items(wagon_inventory, store, budget, nil)
+          if moved > 0 then storage.drained[wagon.unit_number] = game.tick end
         else
           moved = move_items(store, wagon_inventory, budget, storage.allowed)
         end
@@ -720,6 +727,7 @@ end
 -- Visible cargo: heaps in the wagon, tinted like the ore it carries
 
 local LOAD_ANIMATION = "bulk-wagon-load-" -- .. fill level 1 to 4
+local DRAIN_ANIMATION = "bulk-wagon-drain-" -- the same while a pit unloads: flaps open, craters over them
 local LOAD_LEVELS = 4
 local LOAD_FRAMES = 128 -- frame i shows orientation i / 256, back equals front
 local CARGO_COLORS = {
@@ -751,6 +759,10 @@ local function update_cargo(wagon)
   local unit = wagon.unit_number
   local record = storage.cargo[unit]
   local inventory = wagon.get_inventory(defines.inventory.cargo_wagon)
+  -- unloading: a pit took goods out since the last sweep
+  local drained = storage.drained[unit]
+  local draining = drained ~= nil and game.tick - drained <= SWEEP_PERIOD + TRANSFER_PERIOD
+  if drained and not draining then storage.drained[unit] = nil end
   if inventory.is_empty() then
     if record then
       if record.render.valid then record.render.destroy() end
@@ -769,11 +781,12 @@ local function update_cargo(wagon)
   -- fill level from the share of used slots: any goods show at least a quarter
   local used = #inventory - inventory.count_empty_stacks()
   local level = math.max(1, math.min(LOAD_LEVELS, math.ceil(used / #inventory * LOAD_LEVELS)))
+  local animation = (draining and DRAIN_ANIMATION or LOAD_ANIMATION) .. level
   if not (record and record.render.valid) then
     record = {
       wagon = wagon,
       render = rendering.draw_animation({
-        animation = LOAD_ANIMATION .. level,
+        animation = animation,
         surface = wagon.surface,
         target = wagon,
         render_layer = "cargo-hatch",
@@ -783,14 +796,14 @@ local function update_cargo(wagon)
       }),
       frame = frame,
       item = top,
-      level = level,
+      animation = animation,
     }
     storage.cargo[unit] = record
     return
   end
-  if record.level ~= level then
-    record.render.animation = LOAD_ANIMATION .. level
-    record.level = level
+  if record.animation ~= animation then
+    record.render.animation = animation
+    record.animation = animation
   end
   if record.frame ~= frame then
     record.render.animation_offset = frame
@@ -826,6 +839,7 @@ local function sweep_wagons()
       update_cargo(wagon)
     else
       storage.wagons[unit_number] = nil
+      storage.drained[unit_number] = nil
     end
   end
 end

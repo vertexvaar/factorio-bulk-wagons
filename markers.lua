@@ -1,13 +1,14 @@
--- Green placement markers: while a player holds a station, every free spot on a
--- straight rail nearby is outlined, like the rail signal hints. Drawn only for that
--- player and only while the station is in the cursor, so idle players cost nothing.
+-- Placement markers: while a player holds a station, every free spot on a straight
+-- rail nearby gets the game's rail signal placement indicator. The engine draws those
+-- only for its own signals, so the script draws the same sprite, for that player only
+-- and only while the station is in the cursor, so idle players cost nothing.
 local shared = require("shared")
 
 local markers = {}
 
 local RADIUS = 32 -- tiles around the player
 local REDRAW_DISTANCE = 8 -- tiles the player moves before the markers are redrawn
-local COLOR = { r = 0.1, g = 0.6, b = 0.1, a = 0.4 }
+local SPRITE = "utility/rail_signal_placement_indicator"
 
 local bases = {}
 for _, base in pairs({ shared.pit, shared.loader, shared.belt_loader }) do
@@ -39,30 +40,35 @@ local function draw(player, base)
   local p = player.position
   local objects = {}
   local area = { { p.x - RADIUS, p.y - RADIUS }, { p.x + RADIUS, p.y + RADIUS } }
+  local seen = {}
   for _, rail in pairs(surface.find_entities_filtered({ type = "straight-rail", area = area })) do
     local d = rail.direction
     local vertical = d == defines.direction.north or d == defines.direction.south
     if vertical or d == defines.direction.east or d == defines.direction.west then
-      local position = rail.position
-      local spec = {
-        name = shared.variant_name(base, vertical and 1 or 2),
-        position = position,
-        force = player.force,
-        build_check_type = defines.build_check_type.manual,
-      }
-      if surface.can_place_entity(spec) then
-        -- the station's footprint: 6 tiles across the track, 2 along it
-        local hw, hh = 2.9, 0.9
-        if not vertical then hw, hh = 0.9, 2.9 end
-        objects[#objects + 1] = rendering.draw_rectangle({
-          surface = surface,
-          left_top = { position.x - hw, position.y - hh },
-          right_bottom = { position.x + hw, position.y + hh },
-          color = COLOR,
-          width = 2,
-          players = { player },
-          draw_on_ground = true,
-        })
+      -- a station is 2 tiles long and keeps the 1-tile grid along the rail: on each
+      -- 2-tile rail piece it can sit centred, or one tile further on
+      for step = 0, 1 do
+        local position = vertical and { x = rail.position.x, y = rail.position.y + step }
+          or { x = rail.position.x + step, y = rail.position.y }
+        local key = position.x .. "," .. position.y
+        if not seen[key] then
+          seen[key] = true
+          local spec = {
+            name = shared.variant_name(base, vertical and 1 or 2),
+            position = position,
+            force = player.force,
+            build_check_type = defines.build_check_type.manual,
+          }
+          if surface.can_place_entity(spec) then
+            objects[#objects + 1] = rendering.draw_sprite({
+              sprite = SPRITE,
+              orientation = vertical and 0 or 0.25,
+              surface = surface,
+              target = position,
+              players = { player },
+            })
+          end
+        end
       end
     end
   end

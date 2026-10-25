@@ -128,9 +128,9 @@ def main(render_dir):
     if os.path.isdir(src):
         o = origin_of(src, 1.0)
         meta["wagon"] = {}
-        for kind in ("color", "mask", "shadow", "load1", "load2", "load3", "load4"):
+        for kind in ("color", "mask", "shadow", *(f"{p}{n}" for p in ("load", "drain") for n in range(1, 5))):
             images = lifted(frames(src, kind, 128, 1.0), WAGON_LIFT)
-            if kind.startswith("load"):
+            if kind.startswith(("load", "drain")):
                 images = heap_fit(images, HEAP_DROP, HEAP_STRETCH)
             meta["wagon"][kind] = write_sheet(images, o, f"bulk-wagon-{kind}", 8, 4)
 

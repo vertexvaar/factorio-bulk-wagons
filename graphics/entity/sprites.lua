@@ -30,39 +30,75 @@ return {
     },
     ["load1"] = {
       ["files"] = { "bulk-wagon-load1-1.png", "bulk-wagon-load1-2.png", "bulk-wagon-load1-3.png", "bulk-wagon-load1-4.png" },
-      ["width"] = 360,
-      ["height"] = 280,
+      ["width"] = 376,
+      ["height"] = 307,
       ["line_length"] = 8,
       ["lines_per_file"] = 4,
       ["frame_count"] = 128,
-      ["shift"] = { 0.0000, -0.2844 }
+      ["shift"] = { 0.0000, -0.7141 }
     },
     ["load2"] = {
       ["files"] = { "bulk-wagon-load2-1.png", "bulk-wagon-load2-2.png", "bulk-wagon-load2-3.png", "bulk-wagon-load2-4.png" },
-      ["width"] = 360,
-      ["height"] = 287,
+      ["width"] = 376,
+      ["height"] = 308,
       ["line_length"] = 8,
       ["lines_per_file"] = 4,
       ["frame_count"] = 128,
-      ["shift"] = { 0.0000, -0.4484 }
+      ["shift"] = { 0.0000, -0.7375 }
     },
     ["load3"] = {
       ["files"] = { "bulk-wagon-load3-1.png", "bulk-wagon-load3-2.png", "bulk-wagon-load3-3.png", "bulk-wagon-load3-4.png" },
-      ["width"] = 349,
-      ["height"] = 294,
+      ["width"] = 376,
+      ["height"] = 309,
       ["line_length"] = 8,
       ["lines_per_file"] = 4,
       ["frame_count"] = 128,
-      ["shift"] = { -0.0078, -0.6437 }
+      ["shift"] = { 0.0000, -0.7609 }
     },
     ["load4"] = {
       ["files"] = { "bulk-wagon-load4-1.png", "bulk-wagon-load4-2.png", "bulk-wagon-load4-3.png", "bulk-wagon-load4-4.png" },
-      ["width"] = 359,
-      ["height"] = 286,
+      ["width"] = 376,
+      ["height"] = 308,
       ["line_length"] = 8,
       ["lines_per_file"] = 4,
       ["frame_count"] = 128,
-      ["shift"] = { -0.0078, -0.9094 }
+      ["shift"] = { 0.0000, -0.7844 }
+    },
+    ["drain1"] = {
+      ["files"] = { "bulk-wagon-drain1-1.png", "bulk-wagon-drain1-2.png", "bulk-wagon-drain1-3.png", "bulk-wagon-drain1-4.png" },
+      ["width"] = 376,
+      ["height"] = 307,
+      ["line_length"] = 8,
+      ["lines_per_file"] = 4,
+      ["frame_count"] = 128,
+      ["shift"] = { 0.0000, -0.7141 }
+    },
+    ["drain2"] = {
+      ["files"] = { "bulk-wagon-drain2-1.png", "bulk-wagon-drain2-2.png", "bulk-wagon-drain2-3.png", "bulk-wagon-drain2-4.png" },
+      ["width"] = 376,
+      ["height"] = 308,
+      ["line_length"] = 8,
+      ["lines_per_file"] = 4,
+      ["frame_count"] = 128,
+      ["shift"] = { 0.0000, -0.7375 }
+    },
+    ["drain3"] = {
+      ["files"] = { "bulk-wagon-drain3-1.png", "bulk-wagon-drain3-2.png", "bulk-wagon-drain3-3.png", "bulk-wagon-drain3-4.png" },
+      ["width"] = 376,
+      ["height"] = 309,
+      ["line_length"] = 8,
+      ["lines_per_file"] = 4,
+      ["frame_count"] = 128,
+      ["shift"] = { 0.0000, -0.7609 }
+    },
+    ["drain4"] = {
+      ["files"] = { "bulk-wagon-drain4-1.png", "bulk-wagon-drain4-2.png", "bulk-wagon-drain4-3.png", "bulk-wagon-drain4-4.png" },
+      ["width"] = 376,
+      ["height"] = 308,
+      ["line_length"] = 8,
+      ["lines_per_file"] = 4,
+      ["frame_count"] = 128,
+      ["shift"] = { 0.0000, -0.7844 }
     }
   },
   ["b3-1"] = {

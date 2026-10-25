@@ -28,9 +28,14 @@ END_Y = 3.2  # headstock
 EDGES = (-TOP_HALF_LEN, -TOP_HALF_LEN / 3, TOP_HALF_LEN / 3, TOP_HALF_LEN)
 BAYS = tuple((EDGES[i] + EDGES[i + 1]) / 2 for i in range(3))
 BAY_HALF = TOP_HALF_LEN / 3
-# how far the heaps sink per fill level, from a quarter full to full; low heaps
-# disappear into the funnels, whose walls hide what sticks through them
-LOAD_DROPS = (0.6, 0.4, 0.2, 0.0)
+# heap shape per fill level, from a quarter full to full: how far its edge sinks and
+# how high it mounds in the middle (below zero: a hollow). The edge stays above the
+# funnels, so the goods always cover the hopper and its sloped floor never shows.
+LOAD_SHAPES = ((0.1, -0.1), (0.07, 0.05), (0.04, 0.18), (0.0, 0.32))
+# while a pit unloads, the goods drain through the open flaps: a steep crater over each
+# opening, down to a dark hole where they fall through
+DRAIN_SLOPE = 1.1
+HOLE_R = 0.17
 
 
 def materials(planet="nauvis"):
@@ -212,7 +217,31 @@ def ends(m):
     rig.cylinder("brake_spindle", (0.55, -2.9, SILL), (0.55, -2.9, SILL + 0.4), 0.015, m["dark"])
 
 
-heaps = []
+heaps = []  # (heap, bay centre)
+holes = []
+HEAP_N = 28
+HEAP_HX, HEAP_HY = HALF_W - 0.05, BAY_HALF + 0.03  # neighbours overlap, no seam over the ridges
+
+
+def heap_z(u, v, level, drain):
+    """Height of the heap surface at (u, v) in [-1, 1]^2 of its compartment."""
+    edge_drop, mound = LOAD_SHAPES[level - 1]
+    r = max(abs(u) ** 1.6, abs(v) ** 1.6)
+    z = BODY_TOP - 0.38 - edge_drop + mound * (1 - r) ** 1.4
+    if drain:
+        d = math.hypot(u * HEAP_HX, v * HEAP_HY)
+        z = min(z, Z_LOW + DRAIN_SLOPE * max(0.0, d - HOLE_R * 0.6))
+    return z
+
+
+def shape_heaps(level, drain):
+    for heap, y0 in heaps:
+        for k, vert in enumerate(heap.data.vertices):
+            i, j = k % (HEAP_N + 1), k // (HEAP_N + 1)
+            vert.co.z = heap_z(i / HEAP_N * 2 - 1, j / HEAP_N * 2 - 1, level, drain)
+        heap.data.update()
+    for hole in holes:
+        hole.scale = (1, 1, 1) if drain else (0, 0, 0)
 
 
 def cargo(m):
@@ -223,17 +252,14 @@ def cargo(m):
     rocks.noise_scale = 0.07
     lumps = bpy.data.textures.new("lumps", "CLOUDS")
     lumps.noise_scale = 0.35
-    n = 28
-    hx, hy = HALF_W - 0.05, BAY_HALF - 0.08
+    n = HEAP_N
+    hx, hy = HEAP_HX, HEAP_HY
     for y0 in BAYS:
         verts, faces = [], []
         for j in range(n + 1):
             for i in range(n + 1):
                 u, v = i / n * 2 - 1, j / n * 2 - 1
-                # mound: high in the middle, down to the walls
-                r = max(abs(u) ** 1.6, abs(v) ** 1.6)
-                z = BODY_TOP - 0.38 + 0.32 * (1 - r) ** 1.4
-                verts.append((u * hx, y0 + v * hy, z))
+                verts.append((u * hx, y0 + v * hy, heap_z(u, v, 4, False)))
         for j in range(n):
             for i in range(n):
                 a = j * (n + 1) + i
@@ -245,9 +271,13 @@ def cargo(m):
             disp.strength = strength
             disp.direction = "Z"
         heap["load"] = True
-        heaps.append(heap)
+        heaps.append((heap, y0))
         for poly in heap.data.polygons:
             poly.use_smooth = True
+        # the open flaps under the crater: a dark hole the goods fall through
+        hole = rig.cylinder(f"drain_hole{y0}", (0, y0, Z_LOW - 0.02), (0, y0, Z_LOW + 0.04), HOLE_R, m["dark"], verts=20)
+        hole["load"] = True
+        holes.append(hole)
 
 
 def build(planet="nauvis"):
@@ -268,9 +298,9 @@ if __name__ == "__main__":
     frames = [int(x) for x in a[1:]] or list(range(128))
     build()
     rig.render_frames(out, frames, lambda i: i / 256, passes=("color", "mask", "shadow"), samples=32)
-    for level, drop in enumerate(LOAD_DROPS, start=1):
-        for heap in heaps:
-            heap.location.z = -drop
-        rig.render_frames(out, frames, lambda i: i / 256, passes=("load",), samples=32)
-        for i in frames:
-            os.replace(os.path.join(out, f"load_{i:03d}.png"), os.path.join(out, f"load{level}_{i:03d}.png"))
+    for drain, prefix in ((False, "load"), (True, "drain")):
+        for level in range(1, len(LOAD_SHAPES) + 1):
+            shape_heaps(level, drain)
+            rig.render_frames(out, frames, lambda i: i / 256, passes=("load",), samples=32)
+            for i in frames:
+                os.replace(os.path.join(out, f"load_{i:03d}.png"), os.path.join(out, f"{prefix}{level}_{i:03d}.png"))

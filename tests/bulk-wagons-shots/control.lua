@@ -100,7 +100,7 @@ local function setup()
       direction = i == 4 and defines.direction.south or defines.direction.north, raise_built = true,
     })
   end
-  cmp[3].get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 2000 })
+  cmp[3].get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 400 }) -- a quarter full
   -- a loaded wagon on east-west track, for the heap's fit in that direction
   rail_line(surface, false, -28, 35, 61)
   local loaded = train(surface, false, -28, 46, 1, { r = 0.56, g = 0.23, b = 0.15, a = 0.5 })
