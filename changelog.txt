@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.3
+Date: 2026-10-25
+  Features:
+    - While a pit unloads a wagon, its cargo drains through the open bottom flaps: a crater over each flap with a dark opening.
+  Changes:
+    - Stations keep the 1-tile grid along the track, like rail signals, so three fit under every wagon of a train, not only every other one.
+    - The placement hints use the game's rail signal placement indicators instead of green frames.
+  Bugfixes:
+    - Partly loaded wagons no longer show the hopper floor around the cargo; the cargo stays against the walls at every fill level.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.2
 Date: 2026-10-25
   Changes:
