@@ -105,6 +105,15 @@ local function setup()
   rail_line(surface, false, -28, 35, 61)
   local loaded = train(surface, false, -28, 46, 1, { r = 0.56, g = 0.23, b = 0.15, a = 0.5 })
   loaded[1].get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 2000 })
+  -- pits in a row on both track directions, for the seams between them and the track ends
+  rail_line(surface, true, -51, -15, 15)
+  for _, y in pairs({ -2, 0, 2 }) do
+    station(surface, "bulk-unloading-pit", { -51, y })
+  end
+  rail_line(surface, false, 7, -45, -27)
+  for _, x in pairs({ -39, -37, -35 }) do
+    station(surface, "bulk-unloading-pit-2", { x, 7 })
+  end
   storage.s = s
   storage.hw = hw
 end
@@ -126,6 +135,8 @@ script.on_event(defines.events.on_tick, function(event)
     [151] = { "horizontal", { 0, 19 } },
     [152] = { "pit-close", { 3, -22 } },
     [153] = { "train-compare", { 31, -3 } },
+    [154] = { "pit-row", { -51, 0 } },
+    [155] = { "pit-row-h", { -37, 7 } },
   }
   local shot = shots[age]
   if shot then
@@ -133,7 +144,7 @@ script.on_event(defines.events.on_tick, function(event)
       surface = game.surfaces.nauvis,
       position = shot[2],
       resolution = shot[1] == "train-compare" and { 1080, 1920 } or { 1920, 1080 },
-      zoom = shot[1] == "pit-close" and 2 or 1,
+      zoom = (shot[1] == "pit-close" or shot[1]:find("pit-row")) and 2 or 1,
       path = "bulk-shots/" .. shot[1] .. ".png",
       show_entity_info = false,
       daytime = 0,

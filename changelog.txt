@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.2
+Date: 2026-10-25
+  Changes:
+    - Unloading pits in a row join edge to edge: no ground or gravel shows between them any more.
+    - The pit ends in a concrete sill under the track, so plain track meets a light sill instead of the open pit.
+    - The pit's gravel apron is only at its far ends now, it no longer spills onto a neighbouring pit.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.1
 Date: 2026-10-24
   Features:

@@ -3,3 +3,4 @@ tests/.env/
 __pycache__/
 tools/blender/out/
 dist/
+tools/blender/scenes/

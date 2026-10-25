@@ -34,10 +34,12 @@ def reset():
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
-    # use an NVIDIA card when there is one; much faster than the CPU
+    # use an NVIDIA card when there is one; much faster than the CPU. BULK_GPU=CUDA picks
+    # CUDA where OptiX fails to load its kernel (older drivers)
     try:
         prefs = bpy.context.preferences.addons["cycles"].preferences
-        for backend in ("OPTIX", "CUDA"):
+        backends = [os.environ["BULK_GPU"]] if os.environ.get("BULK_GPU") else ("OPTIX", "CUDA")
+        for backend in backends:
             prefs.compute_device_type = backend
             prefs.get_devices()
             gpus = [d for d in prefs.devices if d.type == backend]
@@ -577,6 +579,7 @@ def render_frames(out_dir, frames, orientation_of, passes=("color", "mask", "sha
 
     pose(i), if given, is called before rendering frame i to set up animated parts.
     """
+    out_dir = os.path.abspath(out_dir)  # Blender does not resolve relative output paths against the working dir
     os.makedirs(out_dir, exist_ok=True)
     scene = bpy.context.scene
     # build_sprites.py needs the framing to place the entity origin

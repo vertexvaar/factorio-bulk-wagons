@@ -79,9 +79,10 @@ def _math(nt, op, a, b=None):
 
 
 def apron(p):
-    """Gravel and trodden earth around the pit that fade into the ground with a ragged
-    edge, like the ballast of the rails, so the pit has no hard outline. Left out over
-    the track, where the game draws its own ballast."""
+    """Gravel and trodden earth at the far ends of the pit that fade into the ground with
+    a ragged edge, like the ballast of the rails. Only beyond the ends: along the track
+    the pit stops at its footprint, so pits in a row join without ground between them
+    and no gravel spills onto the neighbour."""
     def build(nt, coord):
         xyz = nt.nodes.new("ShaderNodeSeparateXYZ")
         nt.links.new(coord.outputs["Object"], xyz.inputs[0])
@@ -89,7 +90,7 @@ def apron(p):
         ay = _math(nt, "ABSOLUTE", xyz.outputs["Y"])
         # distance outside the 6 x 2 footprint, roughened by noise
         out_x = _math(nt, "MAXIMUM", _math(nt, "SUBTRACT", ax, 2.85), 0.0)
-        out_y = _math(nt, "MAXIMUM", _math(nt, "SUBTRACT", ay, 0.85), 0.0)
+        out_y = _math(nt, "MAXIMUM", _math(nt, "SUBTRACT", ay, 1.0), 0.0)
         dist = _math(nt, "SQRT", _math(nt, "ADD", _math(nt, "MULTIPLY", out_x, out_x), _math(nt, "MULTIPLY", out_y, out_y)))
         noise = nt.nodes.new("ShaderNodeTexNoise")
         noise.inputs["Scale"].default_value = 3.5
@@ -98,9 +99,9 @@ def apron(p):
         ragged = _math(nt, "ADD", dist, _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", noise.outputs["Fac"], 0.5), 0.5))
         fade = _math(nt, "SUBTRACT", 1.0, _math(nt, "DIVIDE", ragged, 0.6))
         fade.node.use_clamp = True
-        # nothing over the track bed
-        off_track = _math(nt, "GREATER_THAN", ax, 1.05)
-        alpha = _math(nt, "MULTIPLY", fade, off_track)
+        # only beyond the end walls
+        beyond_ends = _math(nt, "GREATER_THAN", ax, 2.85)
+        alpha = _math(nt, "MULTIPLY", fade, beyond_ends)
         # grey gravel with darker earth between the stones
         stones = nt.nodes.new("ShaderNodeTexVoronoi")
         stones.inputs["Scale"].default_value = 26
@@ -113,13 +114,13 @@ def apron(p):
         return ramp.outputs["Color"], alpha
     mat = _alpha_material("apron", build)
     rig.mesh("apron", [(-3.6, -1.6, 0.005), (3.6, -1.6, 0.005), (3.6, 1.6, 0.005), (-3.6, 1.6, 0.005)], [(0, 1, 2, 3)], mat)
-    # a few loose stones spilled over the edge
+    # a few loose stones spilled over the ends
     import random
     rnd = random.Random(7)
-    for k in range(60):
+    for k in range(30):
         sx = rnd.choice((-1, 1))
-        x = sx * rnd.uniform(1.15, 3.25)
-        y = rnd.choice((-1, 1)) * rnd.uniform(0.75, 1.3) if abs(x) < 2.85 else rnd.uniform(-1.1, 1.1)
+        x = sx * rnd.uniform(3.02, 3.3)
+        y = rnd.uniform(-1.1, 1.1)
         s = rnd.uniform(0.03, 0.06)
         rig.box(f"stone{k}", (x, y, s * 0.3), (s, s * rnd.uniform(0.7, 1.2), s * 0.6), p["concrete"], bevel=0.01,
                 rotation=(0, 0, rnd.uniform(0, 3.14)))
@@ -152,17 +153,23 @@ def haze(p):
 
 
 def pit(p):
-    # concrete curbs, sunk flush with the ground, with riveted steel cover plates; the
-    # gravel apron overlaps their outer edge
+    # concrete curbs, sunk flush with the ground, with riveted steel cover plates. They
+    # reach the edge of the footprint, so pits in a row meet curb to curb
     for sx in (-1, 1):
-        x0, x1 = sx * 1.02, sx * 2.98
+        x0, x1 = sx * 1.02, sx * 3.0
         cx, w = (x0 + x1) / 2, abs(x1 - x0)
         for sy in (-1, 1):
-            rig.box(f"curb{sx}{sy}", (cx, sy * 0.9, -0.1), (w, 0.2, 0.2), p["concrete"], bevel=0.02)
-            kit.plate((cx, sy * 0.88, 0.012), (w, 0.16, 0.02), p["olive"], panels=4)
+            rig.box(f"curb{sx}{sy}", (cx, sy * 0.9, -0.1), (w, 0.2, 0.2), p["concrete"], bevel=0.01)
+            kit.plate((cx, sy * 0.9, 0.012), (w, 0.2, 0.02), p["olive"], panels=4)
             kit.hazard((cx, sy * 0.8, 0.02), (w - 0.1, 0.03, 0.03), stripes=int(w / 0.18))
-        rig.box(f"end_wall{sx}", (sx * 2.9, 0, -0.1), (0.2, 1.6, 0.2), p["concrete"], bevel=0.02)
-        kit.plate((sx * 2.88, 0, 0.012), (0.16, 1.6, 0.02), p["olive"])
+        rig.box(f"end_wall{sx}", (sx * 2.9, 0, -0.1), (0.2, 2.0, 0.2), p["concrete"], bevel=0.01)
+        kit.plate((sx * 2.9, 0, 0.012), (0.2, 1.6, 0.02), p["olive"])
+    # concrete sills under the track at both ends close the pit to the footprint edge:
+    # pits in a row show sill against sill, the plain track meets a light sill instead
+    # of the open pit
+    for sy in (-1, 1):
+        rig.box(f"sill{sy}", (0, sy * 0.9, -0.1), (2.06, 0.2, 0.2), p["concrete"], bevel=0.01)
+        kit.ibeam((-1.02, sy * 0.8, -0.03), (1.02, sy * 0.8, -0.03), size=0.06)
     # funnel walls: riveted steel sloping down to the belt trough
     rig.mesh("funnel", [
         (-2.8, -0.8, 0), (2.8, -0.8, 0), (2.8, 0.8, 0), (-2.8, 0.8, 0),

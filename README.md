@@ -28,6 +28,12 @@ Other mods can register bulk goods with `remote.call("bulk-wagons", "add_allowed
 
 Graphics are rendered with Blender from the scripts in `tools/blender` (`render_all.sh`, then `build_sprites.py`). Colour masks follow the vanilla rules (FFF #218): parts that take the colour are rendered in neutral grey (materials with `paint=True`, or objects with `mask`), their `*_mask` pass only marks where the colour goes, and `pack.py` fills the mask with half the brightness of the grey paint. The game applies the colour at alpha 0.5. `python tools/package.py` builds the portal zip.
 
+`render_all.sh <out_dir> e1` renders a single part; `build_sprites.py` then only replaces the sprite sets found in
+`<out_dir>` and keeps the others. To look at a model in Blender, `blender -b --factory-startup -P
+tools/blender/save_scenes.py -- e1` (or `b1`, `b3`, `wagon`) saves the scene to `tools/blender/scenes/*.blend`; the
+scripts stay the source, edits in the .blend file do not reach the sprites. Set `BULK_GPU=CUDA` when Cycles cannot
+load its OptiX kernel.
+
 
 `python tests/run.py` starts Factorio headless in an isolated environment, builds a test scene with the harness mod in `tests/bulk-wagons-test` and prints the `BULKTEST` results.
 
