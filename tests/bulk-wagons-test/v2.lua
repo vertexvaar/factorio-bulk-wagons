@@ -91,11 +91,21 @@ function v2.setup(s, report_fn)
     return remote.call("bulk-wagons", "align_station", e)
   end
   s.old = { legacy("bulk-unloading-pit", -13), legacy("bulk-unloading-pit", -11), legacy("bulk-unloading-pit", -9) }
-  remote.call("bulk-wagons", "get_inventory", s.old[2]).insert({ name = "stone", count = 321 })
+  -- all three pits full: the bunker must hold all of it
+  s.old_total = 0
+  for _, pit in pairs(s.old) do
+    s.old_total = s.old_total + remote.call("bulk-wagons", "get_inventory", pit).insert({ name = "stone", count = 1000000 })
+  end
   s.old_loader = legacy("bulk-loading-station", -2)
 end
 
 function v2.after_setup(s)
+  -- goods spilled around the silo, as the 0.4.0 update did, come back in
+  local surface = game.surfaces.nauvis
+  s.recovered_before = remote.call("bulk-wagons", "get_inventory", s.silo).get_item_count("coal")
+  surface.spill_item_stack({ position = { s.silo.position.x + 6, s.silo.position.y }, stack = { name = "coal", count = 500 } })
+  remote.call("bulk-wagons", "recover_spilled", { { s.silo.position.x - 5, -30 }, { s.silo.position.x + 5, 10 } })
+  s.recovered = remote.call("bulk-wagons", "get_inventory", s.silo).get_item_count("coal") - s.recovered_before
   -- migrate on demand (a fresh game counts as migrated)
   remote.call("bulk-wagons", "migrate_legacy", { { X0 + 30, -60 }, { X0 + 60, 60 } })
 end
@@ -138,7 +148,10 @@ function v2.check(s)
   report(#bunkers == 1 and #pits == 0 and bunkers[1].position.y == -11, "three pits become one bunker on their wagon slot",
     #bunkers .. " bunkers, " .. #pits .. " pits")
   local stone = bunkers[1] and remote.call("bulk-wagons", "get_inventory", bunkers[1]).get_item_count("stone") or 0
-  report(stone == 321, "the pits' goods move into the bunker", stone .. " stone")
+  report(stone == s.old_total, "the goods of three full pits fit into the bunker", stone .. " of " .. s.old_total .. " stone")
+  local loose = surface.find_entities_filtered({ type = "item-entity", area = { { xm - 20, -30 }, { xm + 20, 10 } } })
+  report(#loose == 0, "nothing spilled on update", #loose .. " stacks on the ground")
+  report(s.recovered == 500, "spilled goods around a silo are taken back in", s.recovered .. " coal recovered")
   local silos = surface.find_entities_filtered({ name = "bulk-loading-silo", area = { { xm - 4, -8 }, { xm + 4, 4 } } })
   report(#silos == 1 and silos[1].position.y == -4, "a loader at a wagon end becomes a silo on that wagon's slot",
     #silos == 1 and serpent.line(silos[1].position) or (#silos .. " silos"))

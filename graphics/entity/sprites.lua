@@ -1437,7 +1437,7 @@ return {
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.2270 }
+      ["shift"] = { 0.0000, -0.2114 }
     },
     ["in"] = {
       ["files"] = { "connector-basic-in.png" },
@@ -1446,7 +1446,7 @@ return {
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.2270 }
+      ["shift"] = { 0.0000, -0.2114 }
     }
   },
   ["connector-fast"] = {
@@ -1457,7 +1457,7 @@ return {
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.2270 }
+      ["shift"] = { 0.0000, -0.2114 }
     },
     ["in"] = {
       ["files"] = { "connector-fast-in.png" },
@@ -1466,7 +1466,7 @@ return {
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.2270 }
+      ["shift"] = { 0.0000, -0.2114 }
     }
   },
   ["connector-express"] = {
@@ -1477,7 +1477,7 @@ return {
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.2270 }
+      ["shift"] = { 0.0000, -0.2114 }
     },
     ["in"] = {
       ["files"] = { "connector-express-in.png" },
@@ -1486,7 +1486,7 @@ return {
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.2270 }
+      ["shift"] = { 0.0000, -0.2114 }
     }
   },
   ["connector-turbo"] = {
@@ -1497,7 +1497,7 @@ return {
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.2270 }
+      ["shift"] = { 0.0000, -0.2114 }
     },
     ["in"] = {
       ["files"] = { "connector-turbo-in.png" },
@@ -1506,7 +1506,7 @@ return {
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.2270 }
+      ["shift"] = { 0.0000, -0.2114 }
     }
   }
 }

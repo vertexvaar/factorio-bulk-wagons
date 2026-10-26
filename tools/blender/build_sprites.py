@@ -170,10 +170,10 @@ def main(render_dir):
         for tier, tint in CONNECTOR_TINTS.items():
             out = [pack.tinted(c, m, tint) for c, m in zip(color, mask)]
             meta[f"connector-{tier}"] = {
-                # the game turns an output loader towards its container: its north frame
-                # has the station north, so the model (station south) is turned around
+                # checked in game: for both kinds the station lies in the frame's
+                # direction, the model has it south, so every frame is turned around
                 "out": write_sheet([out[2], out[3], out[0], out[1]], o, f"connector-{tier}-out", 4),
-                "in": write_sheet(out, o, f"connector-{tier}-in", 4),
+                "in": write_sheet([out[2], out[3], out[0], out[1]], o, f"connector-{tier}-in", 4),
             }
 
     # sets missing from render_dir keep their entries, so one part can be re-rendered alone

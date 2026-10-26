@@ -193,7 +193,8 @@ local function wagon_station(def)
         picture = picture,
       }
       local store = window_entity(def, shared.store_name(def.name, variant, planet), h, h, { 0, 0 })
-      store.inventory_size = math.max(1, math.floor(wagon_slots * def.inventory + 0.5))
+      -- as big as the three stations it replaces, so their goods fit on update
+      store.inventory_size = math.max(1, math.floor(3 * wagon_slots * def.inventory + 0.5))
       store.inventory_type = "with_filters_and_bar"
       store.integration_patch = graphics.preview_patch(picture, def.sprite, variant, planet, store.offset)
       store.integration_patch_render_layer = def.render_layer

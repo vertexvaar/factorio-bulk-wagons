@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.1
+Date: 2026-10-26
+  Bugfixes:
+    - Bunker and silo hold as much as the three old stations they replace, so the update no longer spills goods on the ground.
+    - On updating from 0.4.0, bulk goods lying around a bunker or silo (spilled by that update) are taken back into it.
+    - The connector housing now covers its whole tile at the station and sits right against it, for input and output connectors alike; no ground shows between station and belt.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.0
 Date: 2026-10-26
   Major Features:

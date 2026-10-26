@@ -1104,6 +1104,41 @@ local function migrate_group(group)
   return entity ~= nil
 end
 
+-- 0.4.0 made bunker and silo only as big as one old station, so the update spilled
+-- most goods next to them. 0.4.1 triples their inventory and takes the spilled bulk
+-- goods lying around each bunker and silo back in.
+local RECOVER_RADIUS = 16
+
+local function recover_spilled(area)
+  if storage.recovered_041 and not area then return end
+  storage.recovered_041 = true
+  local recovered = 0
+  for _, record in pairs(storage.stations) do
+    local e, store = record.entity, record.store
+    if not shared.is_legacy(record.base) and e.valid and store and store.valid and inside(e.position, area) then
+      local inventory = store.get_inventory(defines.inventory.chest)
+      local p = e.position
+      local spilled = e.surface.find_entities_filtered({
+        type = "item-entity",
+        area = { { p.x - RECOVER_RADIUS, p.y - RECOVER_RADIUS }, { p.x + RECOVER_RADIUS, p.y + RECOVER_RADIUS } },
+      })
+      for _, item in pairs(spilled) do
+        local stack = item.valid and item.stack
+        if stack and stack.valid_for_read and storage.allowed[stack.name] then
+          local inserted = inventory.insert(stack)
+          recovered = recovered + inserted
+          if inserted >= stack.count then
+            item.destroy()
+          elseif inserted > 0 then
+            stack.count = stack.count - inserted
+          end
+        end
+      end
+    end
+  end
+  if recovered > 0 then log("bulk-wagons: took " .. recovered .. " spilled items back into bunkers and silos") end
+end
+
 -- area (optional, for tests): only the stations inside it, and also after the update ran
 local function migrate_legacy(area)
   if storage.migrated_040 and not area then return end
@@ -1119,6 +1154,7 @@ script.on_init(function()
   collect_wagon_names()
   init_storage()
   storage.migrated_040 = true
+  storage.recovered_041 = true
   build_allowed()
 end)
 
@@ -1130,6 +1166,7 @@ script.on_configuration_changed(function()
   build_allowed()
   rescan()
   migrate_legacy()
+  recover_spilled()
 end)
 
 script.on_event(defines.events.on_runtime_mod_setting_changed, function(event)
@@ -1261,6 +1298,8 @@ remote.add_interface("bulk-wagons", {
   end,
   -- Replaces the legacy stations in area by bunkers and silos, as the 0.4.0 update does.
   migrate_legacy = function(area) migrate_legacy(area) end,
+  -- Takes spilled bulk goods around the bunkers and silos in area back in, as the 0.4.1 update does.
+  recover_spilled = function(area) recover_spilled(area) end,
   -- Whether a connector docks onto a long side of a bunker or silo.
   connector_docked = function(entity) return docked_connector(entity) end,
   -- Turns and centres a station on the rail below it, as a hand-built one would be.
