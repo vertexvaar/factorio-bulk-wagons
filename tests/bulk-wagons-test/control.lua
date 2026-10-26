@@ -368,6 +368,15 @@ script.on_event(defines.events.on_tick, function(event)
   if age == 1 then
     -- stations side by side along the track, as a player places them
     local surface = game.surfaces.nauvis
+    -- outside the cleared scene: trees and rocks of the random map would get in the way
+    for _, e in pairs(surface.find_entities_filtered({ area = { { 67.5, -10 }, { 94.5, 10 } } })) do
+      if e.type == "tree" or e.type == "simple-entity" or e.type == "cliff" then e.destroy() end
+    end
+    local tiles = {}
+    for x = 66, 96 do
+      for y = -12, 11 do tiles[#tiles + 1] = { name = "lab-dark-1", position = { x, y } } end
+    end
+    surface.set_tiles(tiles)
     for i, base in pairs({ "bulk-belt-loader", "bulk-loading-station", "bulk-unloading-pit" }) do
       local x = 61 + 10 * i
       for y = -9, 9, 2 do

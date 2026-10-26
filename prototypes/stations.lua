@@ -427,6 +427,9 @@ for _, def in ipairs(shared.connectors) do
     loader.allow_rail_interaction = false
     loader.speed = belt.speed
     loader.localised_description = { "entity-description.bulk-connector" }
+    loader.structure = graphics.connector_structure(def.tier) or loader.structure
+    loader.icon = graphics.connector_icon(def.tier) or loader.icon
+    loader.icon_size = nil
     if previous then data.raw.loader[previous].next_upgrade = def.name end
     local source_item = data.raw.item[def.loader]
     connectors[#connectors + 1] = loader
@@ -435,7 +438,7 @@ for _, def in ipairs(shared.connectors) do
       {
         type = "item",
         name = def.name,
-        icon = source_item and source_item.icon or source.icon,
+        icon = graphics.connector_icon(def.tier) or source_item and source_item.icon or source.icon,
         subgroup = "train-transport",
         order = "a[train-system]-z[bulk]-e[connector]-" .. #connectors,
         place_result = def.name,

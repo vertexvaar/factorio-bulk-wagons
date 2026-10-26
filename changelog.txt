@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.0
+Date: 2026-10-26
+  Major Features:
+    - One building per wagon: the unloading bunker (under the track) and the loading silo (over it), 6 x 6 tiles each, replace the three stations per wagon.
+    - Bulk connectors in every belt tier dock onto any tile of the long sides of a bunker or silo. They run at their tier's speed and never drop goods on the ground. The faster tiers unlock with the belt research.
+    - Near a train stop, bunker and silo snap onto the wagon slots of a halted train; the placement indicators show the free slots.
+  Changes:
+    - The bunker's gratings can be walked and driven on, its rims and the silo beside the track block players and vehicles.
+    - Unloading pits, belt loaders and portal silos from 0.3 are replaced on update by one bunker or silo per wagon slot, with their contents, circuit settings and colour. Where the new building has no room, the old stations stay and the spot gets a map marker; circuit wires of replaced stations have to be reconnected.
+    - The old stations can no longer be crafted.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.3
 Date: 2026-10-25
   Features:

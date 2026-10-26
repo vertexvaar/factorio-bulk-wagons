@@ -33,10 +33,10 @@ shared.station_half = 3
 -- Connectors: loaders in the belt tiers that dock onto the long sides of a bunker or
 -- silo. Built from the game's own (hidden) loaders; a tier exists when its loader does.
 shared.connectors = {
-  { name = "bulk-connector", loader = "loader", belt = "transport-belt", tech = "bulk-wagons" },
-  { name = "bulk-fast-connector", loader = "fast-loader", belt = "fast-transport-belt", tech = "logistics-2" },
-  { name = "bulk-express-connector", loader = "express-loader", belt = "express-transport-belt", tech = "logistics-3" },
-  { name = "bulk-turbo-connector", loader = "turbo-loader", belt = "turbo-transport-belt", tech = "turbo-transport-belt" },
+  { name = "bulk-connector", tier = "basic", loader = "loader", belt = "transport-belt", tech = "bulk-wagons" },
+  { name = "bulk-fast-connector", tier = "fast", loader = "fast-loader", belt = "fast-transport-belt", tech = "logistics-2" },
+  { name = "bulk-express-connector", tier = "express", loader = "express-loader", belt = "express-transport-belt", tech = "logistics-3" },
+  { name = "bulk-turbo-connector", tier = "turbo", loader = "turbo-loader", belt = "turbo-transport-belt", tech = "turbo-transport-belt" },
 }
 
 -- Rolling stock stands 7 tiles apart. A train halts with the centre of its front

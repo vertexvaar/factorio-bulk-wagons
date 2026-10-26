@@ -25,6 +25,13 @@ WAGON_LIFT = 0.33
 # too high and 7 % too short in the hopper; east-west it fits.
 HEAP_DROP = 0.55
 HEAP_STRETCH = 0.07
+# connector housing colours per belt tier, like the belts' own trim
+CONNECTOR_TINTS = {
+    "basic": (0.93, 0.7, 0.12),
+    "fast": (0.85, 0.22, 0.16),
+    "express": (0.2, 0.55, 0.9),
+    "turbo": (0.45, 0.8, 0.3),
+}
 
 
 def frames(src, kind, count, stretch):
@@ -140,6 +147,8 @@ def main(render_dir):
         ("b1", {"base": 1, "base_mask": 1, "shadow": 1, "top_static": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,
                 "work": 8, "work_mask": 8}),
         ("e1", {"idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8, "work": 8, "work_mask": 8}),
+        *((key, {"base": 1, "base_mask": 1, "shadow": 1, "top_static": 1, "idle": 1, "idle_mask": 1, "extend": 8,
+                 "extend_mask": 8, "work": 8, "work_mask": 8}) for key in ("bunker", "silo")),
     ):
         for v in range(1, 5):
             src = os.path.join(render_dir, key, f"v{v}")
@@ -150,6 +159,22 @@ def main(render_dir):
             for kind, count in layers.items():
                 entry[kind] = write_sheet(frames(src, kind, count, G), o, f"{key}-{v}-{kind}", 8)
             meta[f"{key}-{v}"] = entry
+
+    # connectors: one tinted housing sheet per belt tier, frames north, east, south, west
+    # with the belt leaving the station (out); an input connector shows them turned around
+    src = os.path.join(render_dir, "connector")
+    if os.path.isdir(src):
+        o = origin_of(src, G)
+        color = frames(src, "color", 4, G)
+        mask = frames(src, "mask", 4, G)
+        for tier, tint in CONNECTOR_TINTS.items():
+            out = [pack.tinted(c, m, tint) for c, m in zip(color, mask)]
+            meta[f"connector-{tier}"] = {
+                # the game turns an output loader towards its container: its north frame
+                # has the station north, so the model (station south) is turned around
+                "out": write_sheet([out[2], out[3], out[0], out[1]], o, f"connector-{tier}-out", 4),
+                "in": write_sheet(out, o, f"connector-{tier}-in", 4),
+            }
 
     # sets missing from render_dir keep their entries, so one part can be re-rendered alone
     blocks = {k: f"  [\"{k}\"] = {lua(v, '  ')}" for k, v in meta.items()}
@@ -186,7 +211,13 @@ def icons(render_dir, out_dir):
     if os.path.isdir(w):
         wagon = pack.tinted(pack.load(w, "color", 40), pack.load(w, "mask", 40), WAGON_COLOR)
         fit(wagon, 64).save(os.path.join(out_dir, "bulk-wagon.png"))
-    for key, name in (("e1", "unloading-pit"), ("b3", "belt-loader"), ("b1", "loading-station")):
+    src = os.path.join(render_dir, "connector")
+    if os.path.isdir(src):
+        for tier, tint in CONNECTOR_TINTS.items():
+            img = pack.tinted(pack.load(src, "color", 1, G), pack.load(src, "mask", 1, G), tint)
+            fit(img, 64).save(os.path.join(out_dir, f"connector-{tier}.png"))
+    for key, name in (("e1", "unloading-pit"), ("b3", "belt-loader"), ("b1", "loading-station"), ("bunker", "unloading-bunker"),
+                      ("silo", "loading-silo")):
         src = os.path.join(render_dir, key, "v1")
         if not os.path.isdir(src):
             continue

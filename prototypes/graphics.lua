@@ -134,6 +134,22 @@ function graphics.wagon_load()
   end
 end
 
+-- The housing of a bulk connector in a belt tier (basic, fast, express, turbo), drawn
+-- over the loader's belt; nil without renders.
+function graphics.connector_structure(tier)
+  local set = sprites["connector-" .. tier]
+  if not set then return nil end
+  return {
+    direction_in = { sheet = sheet(set["in"]) },
+    direction_out = { sheet = sheet(set.out) },
+  }
+end
+
+function graphics.connector_icon(tier)
+  local file = "__bulk-wagons__/graphics/icons/connector-" .. tier .. ".png"
+  if sprites["connector-" .. tier] then return file end
+end
+
 -- Tells the script which generated graphics exist (call once, at the end of the data stage).
 function graphics.publish()
   local extend = {}

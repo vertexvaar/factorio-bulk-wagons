@@ -11,39 +11,45 @@ local function rail_line(surface, vertical, fixed, from, to)
   end
 end
 
-local function train(surface, vertical, fixed, at, wagons, color)
-  local dir = vertical and defines.direction.north or defines.direction.east
+-- A halted train at a train stop: the locomotive at the stop, wagons behind it on
+-- the wagon slots (stop + 3 + 7 k along the track).
+local function train_at_stop(surface, vertical, fixed, stop_at, wagons, color)
+  local dir = vertical and defines.direction.north or defines.direction.west
   local function pos(c) return vertical and { fixed, c } or { c, fixed } end
-  local loco = surface.create_entity({ name = "locomotive", force = "player", direction = dir, position = pos(at) })
+  local stop = surface.create_entity({ name = "train-stop", direction = dir, force = "player",
+    position = vertical and { fixed + 2, stop_at } or { stop_at, fixed - 2 } })
+  stop.color = color
+  local loco = surface.create_entity({ name = "locomotive", force = "player", direction = dir, position = pos(stop_at + 3) })
   loco.color = color
   local list = {}
   for i = 1, wagons do
-    local w = surface.create_entity({
-      name = "bulk-wagon", force = "player", direction = dir, raise_built = true,
-      position = pos(at + (vertical and 7 or -7) * i),
-    })
-    if not (w and w.valid) then
-      w = surface.find_entities_filtered({ type = "cargo-wagon", position = pos(at + (vertical and 7 or -7) * i), radius = 3 })[1]
-    end
+    local at = stop_at + 3 + 7 * i
+    local w = surface.create_entity({ name = "bulk-wagon", force = "player", direction = dir, raise_built = true, position = pos(at) })
+    if not (w and w.valid) then w = surface.find_entities_filtered({ type = "cargo-wagon", position = pos(at), radius = 3 })[1] end
     w.color = color
-    log("BULKSHOT wagon color " .. serpent.line(w.color))
-    list[#list + 1] = w
+    list[i] = w
   end
   loco.train.manual_mode = true
-  return list
+  return list, function(i) return stop_at + 3 + 7 * i end
 end
 
 local function station(surface, name, position)
-  return surface.create_entity({ name = name, position = position, force = "player", raise_built = true })
+  local e = surface.create_entity({ name = name, position = position, force = "player", raise_built = true })
+  return remote.call("bulk-wagons", "align_station", e)
 end
 
-local function belt_run(surface, start, step, n, direction)
+local function connector(surface, name, position, direction, kind)
+  local c = surface.create_entity({ name = name, position = position, direction = direction, type = kind, force = "player",
+    raise_built = true })
+  if c then c.update_connections() end
+  return c
+end
+
+local function belt_run(surface, name, start, step, n, direction)
   local belts = {}
   for i = 0, n - 1 do
-    belts[#belts + 1] = surface.create_entity({
-      name = "transport-belt", force = "player", direction = direction,
-      position = { start[1] + step[1] * i, start[2] + step[2] * i },
-    })
+    belts[#belts + 1] = surface.create_entity({ name = name, force = "player", direction = direction,
+      position = { start[1] + step[1] * i, start[2] + step[2] * i } })
   end
   return belts
 end
@@ -63,59 +69,43 @@ local function setup()
   end
   surface.set_tiles(tiles)
   surface.destroy_decoratives({ area = area })
-
-  -- vertical line: wagon over a pit (unloading), one over the silo, one over the belt loader
-  rail_line(surface, true, 1, -61, 61)
-  local wagons = train(surface, true, 1, -30, 3, { r = 0.56, g = 0.23, b = 0.15, a = 0.5 })
-  -- wagon i is centred at -30 + 7 i; its compartments are at centre -1.3, 0, +1.3
-  local y1, y2, y3 = -23, -16, -9
   local s = {}
-  s.pit = station(surface, "bulk-unloading-pit", { 1, y1 + 1 })
-  s.silo = station(surface, "bulk-loading-station", { 1, y2 - 1 })
-  s.belt = station(surface, "bulk-belt-loader", { 1, y3 + 1 })
-  wagons[1].get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 2000 })
-  remote.call("bulk-wagons", "get_inventory", s.silo).insert({ name = "coal", count = 2000 })
-  s.out_belts = belt_run(surface, { 4.5, y1 + 0.5 }, { 1, 0 }, 6, defines.direction.east)
-  s.in_belts = belt_run(surface, { 10.5, y3 + 0.5 }, { -1, 0 }, 7, defines.direction.west)
+  local red = { r = 0.56, g = 0.23, b = 0.15, a = 0.5 }
 
-  -- horizontal line with all three stations rotated, an empty train standing still
-  rail_line(surface, false, 21, -61, 61)
-  local hw = train(surface, false, 21, 20, 2, { r = 0.18, g = 0.43, b = 0.66, a = 0.5 })
-  -- station colours: pit and silo in the train's blue, the belt loader yellow, the last silo keeps the default
-  local colored = {
-    { station(surface, "bulk-unloading-pit-2", { 13, 21 }), { r = 0.18, g = 0.43, b = 0.66 } },
-    { station(surface, "bulk-loading-station-2", { 5, 21 }), { r = 0.18, g = 0.43, b = 0.66 } },
-    { station(surface, "bulk-belt-loader-4", { -9, 21 }), { r = 0.95, g = 0.75, b = 0.1 } },
-    { station(surface, "bulk-loading-station-2", { -21, 21 }), nil },
-  }
-  for _, entry in pairs(colored) do
-    if entry[2] then remote.call("bulk-wagons", "station_color", entry[1], entry[2]) end
+  -- north-south: a bunker unloading the first wagon, a silo loading the second
+  rail_line(surface, true, 1, -61, 61)
+  local wagons, slot = train_at_stop(surface, true, 1, -36, 3, red)
+  wagons[1].get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 2000 })
+  s.bunker = station(surface, "bulk-unloading-bunker", { 1, slot(1) })
+  local yb = slot(1)
+  for _, y in pairs({ yb - 2.5, yb + 0.5 }) do
+    connector(surface, "bulk-connector", { 5, y }, defines.direction.east, "output")
+    belt_run(surface, "transport-belt", { 6.5, y }, { 1, 0 }, 8, defines.direction.east)
   end
-  -- side by side with vanilla: locomotive, cargo wagon, bulk wagon, locomotive
-  rail_line(surface, true, 31, -61, 61)
-  local cmp = {}
-  for i, name in ipairs({ "locomotive", "cargo-wagon", "bulk-wagon", "locomotive" }) do
-    cmp[i] = surface.create_entity({
-      name = name, force = "player", position = { 31, -21 + 7 * i },
-      direction = i == 4 and defines.direction.south or defines.direction.north, raise_built = true,
-    })
+  connector(surface, "bulk-fast-connector", { -3, yb - 0.5 }, defines.direction.west, "output")
+  belt_run(surface, "fast-transport-belt", { -4.5, yb - 0.5 }, { -1, 0 }, 8, defines.direction.west)
+  s.silo = station(surface, "bulk-loading-silo", { 1, slot(2) })
+  remote.call("bulk-wagons", "get_inventory", s.silo).insert({ name = "coal", count = 2500 })
+  local ys = slot(2)
+  connector(surface, "bulk-connector", { 5, ys - 1.5 }, defines.direction.west, "input")
+  s.in_belts = belt_run(surface, "transport-belt", { 12.5, ys - 1.5 }, { -1, 0 }, 7, defines.direction.west)
+  connector(surface, "bulk-express-connector", { -3, ys + 1.5 }, defines.direction.east, "input")
+  s.in_belts2 = belt_run(surface, "express-transport-belt", { -10.5, ys + 1.5 }, { 1, 0 }, 7, defines.direction.east)
+
+  -- east-west: the same in the other direction, station colours in the train's blue
+  local blue = { r = 0.18, g = 0.43, b = 0.66, a = 0.5 }
+  rail_line(surface, false, 27, -61, 61)
+  local hw, hslot = train_at_stop(surface, false, 27, -40, 3, blue)
+  hw[1].get_inventory(defines.inventory.cargo_wagon).insert({ name = "copper-ore", count = 1200 })
+  local b2 = station(surface, "bulk-unloading-bunker", { hslot(1), 27 })
+  local s2 = station(surface, "bulk-loading-silo", { hslot(3), 27 })
+  remote.call("bulk-wagons", "get_inventory", s2).insert({ name = "stone", count = 2000 })
+  for _, e in pairs({ b2, s2 }) do
+    remote.call("bulk-wagons", "station_color", e, { r = 0.18, g = 0.43, b = 0.66 })
   end
-  cmp[3].get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 400 }) -- a quarter full
-  -- a loaded wagon on east-west track, for the heap's fit in that direction
-  rail_line(surface, false, -28, 35, 61)
-  local loaded = train(surface, false, -28, 46, 1, { r = 0.56, g = 0.23, b = 0.15, a = 0.5 })
-  loaded[1].get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 2000 })
-  -- pits in a row on both track directions, for the seams between them and the track ends
-  rail_line(surface, true, -51, -15, 15)
-  for _, y in pairs({ -2, 0, 2 }) do
-    station(surface, "bulk-unloading-pit", { -51, y })
-  end
-  rail_line(surface, false, 7, -45, -27)
-  for _, x in pairs({ -39, -37, -35 }) do
-    station(surface, "bulk-unloading-pit-2", { x, 7 })
-  end
+  connector(surface, "bulk-connector", { hslot(1) - 0.5, 31 }, defines.direction.south, "output")
+  belt_run(surface, "transport-belt", { hslot(1) - 0.5, 32.5 }, { 0, 1 }, 6, defines.direction.south)
   storage.s = s
-  storage.hw = hw
 end
 
 script.on_event(defines.events.on_tick, function(event)
@@ -125,26 +115,26 @@ script.on_event(defines.events.on_tick, function(event)
     return
   end
   local s = storage.s
-  for i = 1, 2 do
-    local line = s.in_belts[1].get_transport_line(i)
-    if line.can_insert_at_back() then line.insert_at_back({ name = "stone", count = 1 }) end
+  for _, belts in pairs({ s.in_belts, s.in_belts2 }) do
+    for i = 1, 2 do
+      local line = belts[1].get_transport_line(i)
+      if line.can_insert_at_back() then line.insert_at_back({ name = "stone", count = 1 }) end
+    end
   end
   local age = game.tick - storage.start
   local shots = {
-    [150] = { "vertical", { 3, -16 } },
-    [151] = { "horizontal", { 0, 19 } },
-    [152] = { "pit-close", { 3, -22 } },
-    [153] = { "train-compare", { 31, -3 } },
-    [154] = { "pit-row", { -51, 0 } },
-    [155] = { "pit-row-h", { -37, 7 } },
+    [150] = { "vertical", { 1, -21 }, 1 },
+    [151] = { "horizontal", { -12, 27 }, 1 },
+    [152] = { "bunker-close", { 1, -27 }, 2 },
+    [153] = { "silo-close", { 1, -22 }, 2 },
   }
   local shot = shots[age]
   if shot then
     game.take_screenshot({
       surface = game.surfaces.nauvis,
       position = shot[2],
-      resolution = shot[1] == "train-compare" and { 1080, 1920 } or { 1920, 1080 },
-      zoom = (shot[1] == "pit-close" or shot[1]:find("pit-row")) and 2 or 1,
+      resolution = { 1920, 1080 },
+      zoom = shot[3],
       path = "bulk-shots/" .. shot[1] .. ".png",
       show_entity_info = false,
       daytime = 0,
