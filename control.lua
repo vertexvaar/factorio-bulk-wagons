@@ -36,8 +36,8 @@ local variant_of = {}
 -- entity name -> planet, for every bulk wagon prototype name
 local wagon_planet = {}
 for _, planet in pairs(shared.planets) do
-  for _, base in pairs({ shared.pit, shared.loader, shared.belt_loader }) do
-    for variant = 1, shared.variant_count do
+  for _, base in pairs(shared.all_bases) do
+    for variant = 1, shared.variant_count_of(base) do
       variant_of[shared.variant_name(base, variant, planet)] = { base = base, variant = variant, planet = planet }
     end
   end
@@ -180,9 +180,19 @@ local function create_port(entity, info)
   return port
 end
 
-local HAS_STORE = { [shared.pit] = true, [shared.loader] = true, [shared.belt_loader] = true }
-local SPRITE_KEY = { [shared.pit] = "e1", [shared.belt_loader] = "b3", [shared.loader] = "b1" }
-local OVERLAY_LAYER = { e1 = "rail-chain-signal-metal", b3 = "higher-object-under", b1 = "higher-object-under" }
+local HAS_STORE = { [shared.pit] = true, [shared.loader] = true, [shared.belt_loader] = true, [shared.bunker] = true,
+  [shared.silo] = true }
+-- stations that take goods out of the wagon
+local UNLOADS = { [shared.pit] = true, [shared.bunker] = true }
+local SPRITE_KEY = { [shared.pit] = "e1", [shared.belt_loader] = "b3", [shared.loader] = "b1", [shared.bunker] = "bunker",
+  [shared.silo] = "silo" }
+-- the bunker's moving parts stand beside the track, under the wagons
+local OVERLAY_LAYER = { e1 = "rail-chain-signal-metal", b3 = "higher-object-under", b1 = "higher-object-under",
+  bunker = "lower-object-above-shadow", silo = "higher-object-under" }
+local CONNECTORS = {}
+for _, def in pairs(shared.connectors) do
+  CONNECTORS[def.name] = true
+end
 -- just above the station picture ("lower-object-above-shadow")
 local BASE_MASK_LAYER = "lower-object-overlay"
 local ANIMATION_SPEED = 0.25
@@ -313,12 +323,40 @@ local function draw_station(record)
   show(record, state)
 end
 
+-- Hidden blockers over the solid parts of a bunker or silo (see shared.solid_parts).
+local function create_blockers(entity, info)
+  local blockers = {}
+  for _, part in pairs(shared.solid_parts[info.base] or {}) do
+    local offset = shared.rotate(part[1], info.variant)
+    local w, h = part[2][1], part[2][2]
+    if not shared.rail_is_vertical(info.variant) then w, h = h, w end
+    local blocker = entity.surface.create_entity({
+      name = shared.blocker_name(w, h),
+      position = { entity.position.x + offset[1], entity.position.y + offset[2] },
+      force = entity.force,
+      create_build_effect_smoke = false,
+    })
+    if blocker then
+      blocker.destructible = false
+      blockers[#blockers + 1] = blocker
+    end
+  end
+  return blockers
+end
+
 local function register_station(entity, info)
   local record = storage.stations[entity.unit_number]
-  if record and record.port and record.port.valid then return end
+  local legacy = shared.is_legacy(info.base)
+  if record and (legacy and record.port and record.port.valid or not legacy and record.store and record.store.valid) then
+    return
+  end
   record = { entity = entity, base = info.base, variant = info.variant }
   if HAS_STORE[info.base] then record.store = create_store(entity, info) end
-  record.port = create_port(entity, info)
+  if legacy then
+    record.port = create_port(entity, info)
+  else
+    record.blockers = create_blockers(entity, info)
+  end
   storage.stations[entity.unit_number] = record
   script.register_on_object_destroyed(entity)
   circuit.attach(record)
@@ -359,6 +397,9 @@ local function remove_station(unit_number, buffer, removing)
       end
     end
     port.destroy()
+  end
+  for _, blocker in pairs(record.blockers or {}) do
+    if blocker.valid then blocker.destroy() end
   end
   if record.entity.valid and record.entity ~= removing then record.entity.destroy() end
 end
@@ -410,17 +451,29 @@ end
 -- hand (align) also turns and centres itself across the rail below it; along the
 -- rail it keeps the 1-tile grid, like a rail signal, so three stations line up under
 -- every wagon of a train.
+-- A bunker or silo within this many tiles of a wagon slot of a train stop snaps onto it.
+local SLOT_SNAP = 3
+
 local function fit_station(entity, info, align)
   local variant = info.variant
   local position = { entity.position.x, entity.position.y }
   if align then
     local rail, vertical = straight_rail_at(entity.surface, entity.position)
     if rail then
-      if vertical ~= shared.rail_is_vertical(variant) then variant = variant % shared.variant_count + 1 end
+      if vertical ~= shared.rail_is_vertical(variant) then variant = variant % shared.variant_count_of(info.base) + 1 end
+      local along = math.floor((vertical and entity.position.y or entity.position.x) + 0.5)
+      if not shared.is_legacy(info.base) then
+        local best
+        for _, slot in pairs(shared.wagon_slots(entity.surface, entity.position, vertical, shared.wagon_pitch * shared.slot_count)) do
+          local d = math.abs(slot - along)
+          if d <= SLOT_SNAP and (not best or d < math.abs(best - along)) then best = slot end
+        end
+        along = best or along
+      end
       if vertical then
-        position = { rail.position.x, math.floor(entity.position.y + 0.5) }
+        position = { rail.position.x, along }
       else
-        position = { math.floor(entity.position.x + 0.5), rail.position.y }
+        position = { along, rail.position.y }
       end
     end
   end
@@ -461,7 +514,7 @@ local function find_wagon(record)
       on_axis
       and wagon_vertical == vertical
       and across < 0.3
-      and along <= 3
+      and along <= (shared.is_legacy(record.base) and 3 or 1.5)
       and wagon.train
       and wagon.train.speed == 0
     then
@@ -514,7 +567,7 @@ local function transfer_pass()
       elseif enabled and store and wagon then
         local wagon_inventory = wagon.get_inventory(defines.inventory.cargo_wagon)
         local moved
-        if record.base == shared.pit then
+        if UNLOADS[record.base] then
           moved = move_items(wagon_inventory, store, budget, nil)
           if moved > 0 then storage.drained[wagon.unit_number] = game.tick end
         else
@@ -544,16 +597,27 @@ end
 -- Build / remove events
 
 -- Stations only go onto straight rails: one built elsewhere is taken back.
-local function refuse(entity, info, player)
+local function refuse(entity, info, player, message)
   local surface, position, quality = entity.surface, entity.position, entity.quality.name
   if player and player.valid then
-    player.create_local_flying_text({ text = { "bulk-wagons.needs-rail" }, position = position })
+    player.create_local_flying_text({ text = { message or "bulk-wagons.needs-rail" }, position = position })
     player.play_sound({ path = "utility/cannot_build" })
   end
   entity.destroy()
   local stack = { name = info.base, count = 1, quality = quality }
   local inserted = player and player.valid and player.insert(stack) or 0
   if inserted == 0 then surface.spill_item_stack({ position = position, stack = stack }) end
+end
+
+-- Whether a connector docks onto a long side of a bunker or silo (the sides along
+-- the track; the ends belong to the track).
+local function docked_connector(connector)
+  local container = connector.loader_container
+  local record = container and storage.stations[storage.store_owner[container.unit_number] or 0]
+  if not (record and record.entity.valid and not shared.is_legacy(record.base)) then return false end
+  local p, c = record.entity.position, connector.position
+  local across = shared.rail_is_vertical(record.variant) and math.abs(c.x - p.x) or math.abs(c.y - p.y)
+  return across > shared.station_half
 end
 
 -- Ghosts of stations placed off the rails disappear again.
@@ -580,6 +644,13 @@ local function on_built(event)
     return
   end
   local cloned = event.destination ~= nil
+  if CONNECTORS[entity.name] then
+    -- a connector built by hand must dock onto the long side of a bunker or silo
+    if event.name == defines.events.on_built_entity and not docked_connector(entity) then
+      refuse(entity, { base = entity.name }, game.get_player(event.player_index), "bulk-wagons.needs-station")
+    end
+    return
+  end
   if is_wagon(entity) then
     if not cloned then entity = fit_wagon(entity) end
     if entity and entity.valid then storage.wagons[entity.unit_number] = entity end
@@ -644,7 +715,8 @@ local function rotate_cursor(event, step)
   end
   local info = name and variant_of[name]
   if not info then return end
-  local next_name = shared.variant_name(info.base, (info.variant - 1 + step) % shared.variant_count + 1)
+  local count = shared.variant_count_of(info.base)
+  local next_name = shared.variant_name(info.base, (info.variant - 1 + step) % count + 1)
   if stack and stack.valid_for_read then
     stack.set_stack({ name = next_name, count = stack.count, quality = stack.quality })
   else
@@ -882,9 +954,171 @@ local function rescan()
   end
 end
 
+--------------------------------------------------------------------------------
+-- 0.4.0: the three-per-wagon stations become one bunker or silo per wagon
+
+local MIGRATE_SNAP = 3.5 -- how far a station may sit from a wagon slot and still count as on it
+
+local function contents_of(record)
+  local items = {}
+  local store = record.store
+  if store and store.valid and store.get_inventory(defines.inventory.chest) then
+    for _, item in pairs(store.get_inventory(defines.inventory.chest).get_contents()) do
+      items[#items + 1] = item
+    end
+  end
+  local port = record.port
+  if port and port.valid then
+    for i = 1, port.get_max_transport_line_index() do
+      for _, item in pairs(port.get_transport_line(i).get_contents()) do
+        items[#items + 1] = item
+      end
+    end
+  end
+  return items
+end
+
+-- Groups the legacy stations by the wagon they serve: by the wagon slot of a nearby
+-- train stop, otherwise by their spacing (up to three stations side by side).
+local function inside(position, area)
+  return not area or position.x >= area[1][1] and position.x <= area[2][1] and position.y >= area[1][2] and position.y <= area[2][2]
+end
+
+local function legacy_groups(area)
+  local lines = {}
+  for unit, record in pairs(storage.stations) do
+    if shared.is_legacy(record.base) and record.entity.valid and inside(record.entity.position, area) then
+      local e = record.entity
+      local vertical = shared.rail_is_vertical(record.variant)
+      local across = vertical and e.position.x or e.position.y
+      local key = e.surface.index .. (vertical and "v" or "h") .. across
+      lines[key] = lines[key] or { surface = e.surface, vertical = vertical, across = across, records = {} }
+      table.insert(lines[key].records, { unit = unit, record = record, along = vertical and e.position.y or e.position.x })
+    end
+  end
+  local groups = {}
+  for _, line in pairs(lines) do
+    table.sort(line.records, function(a, b) return a.along < b.along end)
+    local by_slot, loose = {}, {}
+    for _, entry in pairs(line.records) do
+      local position = entry.record.entity.position
+      local best
+      for _, slot in pairs(shared.wagon_slots(line.surface, position, line.vertical, shared.wagon_pitch * shared.slot_count)) do
+        if math.abs(slot - entry.along) <= MIGRATE_SNAP and (not best or math.abs(slot - entry.along) < math.abs(best - entry.along)) then
+          best = slot
+        end
+      end
+      if best then
+        by_slot[best] = by_slot[best] or {}
+        table.insert(by_slot[best], entry)
+      else
+        loose[#loose + 1] = entry
+      end
+    end
+    for slot, entries in pairs(by_slot) do
+      groups[#groups + 1] = { line = line, along = slot, entries = entries }
+    end
+    local current
+    for _, entry in ipairs(loose) do
+      if current and entry.along - current.entries[1].along <= 4 then
+        table.insert(current.entries, entry)
+      else
+        current = { line = line, entries = { entry } }
+        groups[#groups + 1] = current
+      end
+    end
+  end
+  for _, group in pairs(groups) do
+    if not group.along then
+      group.along = math.floor((group.entries[1].along + group.entries[#group.entries].along) / 2 + 0.5)
+    end
+  end
+  return groups
+end
+
+local function migrate_group(group)
+  local line = group.line
+  local surface = line.surface
+  local unloading = 0
+  for _, entry in pairs(group.entries) do
+    if UNLOADS[entry.record.base] then unloading = unloading + 1 end
+  end
+  local base = unloading * 2 >= #group.entries and shared.bunker or shared.silo
+  local first = group.entries[1].record
+  local force, quality = first.entity.force, first.entity.quality
+  local settings, color = first.settings, first.color
+  local saved, items = {}, {}
+  for _, entry in pairs(group.entries) do
+    local e = entry.record.entity
+    saved[#saved + 1] = { name = e.name, position = e.position, record = entry.record }
+    for _, item in pairs(contents_of(entry.record)) do
+      items[#items + 1] = item
+    end
+    remove_station(entry.unit)
+  end
+  local position = line.vertical and { line.across, group.along } or { group.along, line.across }
+  local name = shared.variant_name(base, line.vertical and 1 or 2, planet_of(surface))
+  if not exists(name) then name = shared.variant_name(base, line.vertical and 1 or 2) end
+  local spec = { name = name, position = position, force = force, quality = quality, create_build_effect_smoke = false }
+  local entity = surface.can_place_entity(spec) and surface.create_entity(spec)
+  local targets = {}
+  if entity then
+    local record = register_station(entity, variant_of[entity.name])
+    if record then
+      record.settings, record.color = settings, color
+      draw_station(record)
+      targets[1] = record
+    end
+  else
+    -- no room: the old stations come back and the spot is marked on the map
+    for _, old in pairs(saved) do
+      local e = surface.create_entity({ name = old.name, position = old.position, force = force, quality = quality,
+        create_build_effect_smoke = false })
+      if e then
+        local record = register_station(e, variant_of[e.name])
+        if record then
+          record.settings, record.color = old.record.settings, old.record.color
+          draw_station(record)
+          targets[#targets + 1] = record
+        end
+      end
+    end
+    force.add_chart_tag(surface, { position = position, text = "Bulk Wagons: no room", icon = { type = "item", name = base } })
+    log("bulk-wagons: no room for a " .. base .. " at " .. serpent.line(position))
+  end
+  -- the goods go back into the new (or restored) inventories; what does not fit is spilled
+  for _, item in pairs(items) do
+    local left = item.count
+    for _, record in pairs(targets) do
+      local store = record.store
+      local inventory = store and store.valid and store.get_inventory(defines.inventory.chest)
+      if inventory and left > 0 then
+        left = left - inventory.insert({ name = item.name, count = left, quality = item.quality })
+      end
+    end
+    if left > 0 then
+      surface.spill_item_stack({ position = position, stack = { name = item.name, count = left, quality = item.quality },
+        enable_looted = true, force = force, allow_belts = false })
+    end
+  end
+  return entity ~= nil
+end
+
+-- area (optional, for tests): only the stations inside it, and also after the update ran
+local function migrate_legacy(area)
+  if storage.migrated_040 and not area then return end
+  storage.migrated_040 = true
+  local done, kept = 0, 0
+  for _, group in pairs(legacy_groups(area)) do
+    if migrate_group(group) then done = done + 1 else kept = kept + 1 end
+  end
+  if done + kept > 0 then log("bulk-wagons: replaced " .. done .. " wagon stations, kept " .. kept) end
+end
+
 script.on_init(function()
   collect_wagon_names()
   init_storage()
+  storage.migrated_040 = true
   build_allowed()
 end)
 
@@ -895,6 +1129,7 @@ script.on_configuration_changed(function()
   init_storage()
   build_allowed()
   rescan()
+  migrate_legacy()
 end)
 
 script.on_event(defines.events.on_runtime_mod_setting_changed, function(event)
@@ -1024,6 +1259,10 @@ remote.add_interface("bulk-wagons", {
     if color or reset then colors.set(record, color) end
     return colors.get(record)
   end,
+  -- Replaces the legacy stations in area by bunkers and silos, as the 0.4.0 update does.
+  migrate_legacy = function(area) migrate_legacy(area) end,
+  -- Whether a connector docks onto a long side of a bunker or silo.
+  connector_docked = function(entity) return docked_connector(entity) end,
   -- Turns and centres a station on the rail below it, as a hand-built one would be.
   align_station = function(entity)
     local info = entity and entity.valid and variant_of[entity.name]

@@ -145,6 +145,78 @@ local function station_variants(def)
     type = "item",
     name = def.name,
     icon = def.icon,
+    -- the three-per-wagon stations give way to bunker and silo; leftovers still build
+    hidden = true,
+    subgroup = "train-transport",
+    order = def.order,
+    place_result = def.name,
+    stack_size = 10,
+  }
+  return prototypes
+end
+
+-- Bunker and silo: 6 x 6 tiles over one wagon, in two variants (1: rail north-south,
+-- 2: rail east-west; the footprint is square, so either fits on either track and the
+-- script turns it). The building blocks other buildings and belts; hidden blockers
+-- (shared.solid_parts) keep players and vehicles off its solid parts.
+local station_mask_v2 = { layers = { [shared.collision_layer] = true, transport_belt = true } }
+
+local function wagon_station(def)
+  local prototypes = {}
+  local h = shared.station_half
+  for _, planet in pairs(shared.active_planets(mods)) do
+    for variant = 1, shared.variant_count_of(def.name) do
+      local name = shared.variant_name(def.name, variant, planet)
+      local picture = graphics.station_picture(def.sprite, variant, planet)
+        or {
+          filename = gfx .. def.placeholder .. "-" .. variant .. ".png",
+          width = 384,
+          height = 384,
+          scale = 0.5,
+          tint = shared.placeholder_tint[planet],
+        }
+      prototypes[#prototypes + 1] = {
+        type = "simple-entity-with-owner",
+        name = name,
+        icon = def.icon,
+        flags = { "placeable-neutral", "player-creation" },
+        hidden_in_factoriopedia = variant ~= 1 or planet ~= shared.default_planet,
+        placeable_by = { item = def.name, count = 1 },
+        minable = { mining_time = 0.8, result = def.name },
+        max_health = 1000,
+        corpse = "big-remnants",
+        dying_explosion = "big-explosion",
+        collision_box = { { -h + 0.1, -h + 0.1 }, { h - 0.1, h - 0.1 } },
+        selection_box = { { -h, -h }, { h, h } },
+        collision_mask = station_mask_v2,
+        render_layer = def.render_layer,
+        picture = picture,
+      }
+      local store = window_entity(def, shared.store_name(def.name, variant, planet), h, h, { 0, 0 })
+      store.inventory_size = math.max(1, math.floor(wagon_slots * def.inventory + 0.5))
+      store.inventory_type = "with_filters_and_bar"
+      store.integration_patch = graphics.preview_patch(picture, def.sprite, variant, planet, store.offset)
+      store.integration_patch_render_layer = def.render_layer
+      store.drawing_box_vertical_extension = def.preview_height
+      store.offset = nil
+      prototypes[#prototypes + 1] = store
+    end
+  end
+  -- the east-west variant only lives in the cursor (rotated with R)
+  prototypes[#prototypes + 1] = {
+    type = "item",
+    name = shared.variant_name(def.name, 2),
+    icon = def.icon,
+    hidden = true,
+    subgroup = "train-transport",
+    order = def.order .. "-2",
+    place_result = shared.variant_name(def.name, 2),
+    stack_size = 10,
+  }
+  prototypes[#prototypes + 1] = {
+    type = "item",
+    name = def.name,
+    icon = def.icon,
     subgroup = "train-transport",
     order = def.order,
     place_result = def.name,
@@ -153,7 +225,7 @@ local function station_variants(def)
   prototypes[#prototypes + 1] = {
     type = "recipe",
     name = def.name,
-    energy_required = 5,
+    energy_required = 10,
     enabled = false,
     ingredients = def.ingredients,
     results = { { type = "item", name = def.name, amount = 1 } },
@@ -274,3 +346,118 @@ data:extend({
   -- Sits at the end of the station and reaches over the side tiles into the wagon.
   make_port(shared.rail_port, fastest, 2, true),
 })
+
+--------------------------------------------------------------------------------
+-- Bunker and silo (0.4.0)
+
+data:extend(wagon_station({
+  name = shared.bunker,
+  icon = "__bulk-wagons__/graphics/icons/unloading-bunker.png",
+  sprite = "bunker",
+  placeholder = "unloading-bunker",
+  -- over ballast and sleepers, under the rail metal; the moving parts are drawn above
+  render_layer = "ground-patch-higher2",
+  order = "a[train-system]-z[bulk]-c[unloading-bunker]",
+  inventory = settings.startup["bulk-wagons-pit-multiplier"].value,
+  ingredients = {
+    { type = "item", name = "concrete", amount = 100 },
+    { type = "item", name = "steel-plate", amount = 50 },
+    { type = "item", name = "iron-gear-wheel", amount = 40 },
+  },
+}))
+
+data:extend(wagon_station({
+  name = shared.silo,
+  icon = "__bulk-wagons__/graphics/icons/loading-silo.png",
+  sprite = "silo",
+  placeholder = "loading-silo",
+  preview_height = 4,
+  render_layer = "lower-object-above-shadow",
+  order = "a[train-system]-z[bulk]-d[loading-silo]",
+  inventory = settings.startup["bulk-wagons-loader-multiplier"].value,
+  ingredients = {
+    { type = "item", name = "steel-plate", amount = 80 },
+    { type = "item", name = "concrete", amount = 40 },
+    { type = "item", name = "iron-gear-wheel", amount = 40 },
+    { type = "item", name = "advanced-circuit", amount = 10 },
+  },
+}))
+
+-- Blockers for the solid parts (both orientations of every strip size).
+local blockers, seen = {}, {}
+for _, parts in pairs(shared.solid_parts) do
+  for _, part in pairs(parts) do
+    for _, size in pairs({ { part[2][1], part[2][2] }, { part[2][2], part[2][1] } }) do
+      local name = shared.blocker_name(size[1], size[2])
+      if not seen[name] then
+        seen[name] = true
+        blockers[#blockers + 1] = {
+          type = "simple-entity-with-owner",
+          name = name,
+          hidden = true,
+          flags = { "not-blueprintable", "not-deconstructable", "not-on-map", "placeable-off-grid", "no-copy-paste",
+            "not-upgradable", "not-selectable-in-game" },
+          selectable_in_game = false,
+          collision_box = { { -size[1] / 2 + 0.05, -size[2] / 2 + 0.05 }, { size[1] / 2 - 0.05, size[2] / 2 - 0.05 } },
+          collision_mask = { layers = { player = true, car = true } },
+          picture = util.empty_sprite(),
+        }
+      end
+    end
+  end
+end
+data:extend(blockers)
+
+-- Connectors: the game's loaders in each belt tier, docking only onto a bunker or silo
+-- (the script takes back one built elsewhere). They never drop goods on the ground: an
+-- output without a belt simply holds them.
+local connectors = {}
+local previous
+for _, def in ipairs(shared.connectors) do
+  local source = data.raw.loader[def.loader]
+  local belt = data.raw["transport-belt"][def.belt]
+  if source and belt then
+    local loader = table.deepcopy(source)
+    loader.name = def.name
+    loader.hidden = false
+    loader.minable = { mining_time = 0.1, result = def.name }
+    loader.placeable_by = nil
+    loader.next_upgrade = nil
+    loader.fast_replaceable_group = "bulk-connector"
+    loader.allow_rail_interaction = false
+    loader.speed = belt.speed
+    loader.localised_description = { "entity-description.bulk-connector" }
+    if previous then data.raw.loader[previous].next_upgrade = def.name end
+    local source_item = data.raw.item[def.loader]
+    connectors[#connectors + 1] = loader
+    data:extend({ loader })
+    data:extend({
+      {
+        type = "item",
+        name = def.name,
+        icon = source_item and source_item.icon or source.icon,
+        subgroup = "train-transport",
+        order = "a[train-system]-z[bulk]-e[connector]-" .. #connectors,
+        place_result = def.name,
+        stack_size = 50,
+      },
+      {
+        type = "recipe",
+        name = def.name,
+        energy_required = 1,
+        enabled = false,
+        ingredients = previous and {
+          { type = "item", name = previous, amount = 1 },
+          { type = "item", name = def.belt, amount = 5 },
+          { type = "item", name = "iron-gear-wheel", amount = 10 },
+        } or {
+          { type = "item", name = def.belt, amount = 5 },
+          { type = "item", name = "iron-gear-wheel", amount = 5 },
+          { type = "item", name = "iron-plate", amount = 5 },
+        },
+        results = { { type = "item", name = def.name, amount = 1 } },
+      },
+    })
+    previous = def.name
+  end
+end

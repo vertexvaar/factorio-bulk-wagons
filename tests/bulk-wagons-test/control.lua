@@ -5,6 +5,8 @@ local function report(ok, what, detail)
   log(string.format("BULKTEST %s %s%s", ok and "PASS" or "FAIL", what, detail and (" (" .. detail .. ")") or ""))
 end
 
+local v2 = require("v2")
+
 local function count(inventory, name)
   return inventory.get_item_count(name)
 end
@@ -358,6 +360,11 @@ script.on_event(defines.events.on_tick, function(event)
     local section = s.cc_g.get_or_create_control_behavior().get_section(1)
     section.set_slot(1, { value = { type = "virtual", name = "signal-A", quality = "normal", comparator = "=" }, min = 1 })
   end
+  if age == 2 then
+    storage.v2 = {}
+    v2.setup(storage.v2, report)
+  end
+  if age == 3 then v2.after_setup(storage.v2) end
   if age == 1 then
     -- stations side by side along the track, as a player places them
     local surface = game.surfaces.nauvis
@@ -376,6 +383,7 @@ script.on_event(defines.events.on_tick, function(event)
   end
   if age == 600 then
     check()
+    v2.check(storage.v2)
     report(storage.saw_drain == true, "unloading wagon shows draining heaps")
     report(helpers.is_valid_sprite_path("utility/rail_signal_placement_indicator"), "placement indicator sprite exists")
     log("BULKTEST DONE")

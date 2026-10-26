@@ -67,6 +67,18 @@ def station(frame, inner, accent, beam):
     return c
 
 
+def wagon_station(frame, inner, accent):
+    # 6 x 6 tiles, rail runs vertically through the middle two tiles, docks on the long sides
+    c = Canvas(6 * TILE, 6 * TILE)
+    for x0 in (0, 4 * TILE):
+        c.rect(x0, 0, x0 + 2 * TILE, 6 * TILE, frame)
+        c.rect(x0 + 8, 8, x0 + 2 * TILE - 8, 6 * TILE - 8, inner)
+    for k in range(6):
+        c.rect(4, k * TILE + 20, 12, k * TILE + 44, accent)
+        c.rect(6 * TILE - 12, k * TILE + 20, 6 * TILE - 4, k * TILE + 44, accent)
+    return c
+
+
 def icon(frame, inner, accent):
     c = Canvas(64, 64)
     c.rect(4, 20, 60, 44, frame)
@@ -86,6 +98,11 @@ def main():
         pit.rotated(v).save(f"unloading-pit-{v + 1}.png")
         loader.rotated(v).save(f"loading-station-{v + 1}.png")
         belt_loader.rotated(v).save(f"belt-loader-{v + 1}.png")
+    bunker = wagon_station((139, 135, 126, 255), (29, 27, 24, 255), belt)
+    silo = wagon_station((122, 90, 44, 255), (154, 138, 106, 255), belt)
+    for v in range(2):
+        bunker.rotated(v).save(f"unloading-bunker-{v + 1}.png")
+        silo.rotated(v).save(f"loading-silo-{v + 1}.png")
     icon((139, 135, 126, 255), (29, 27, 24, 255), belt).save("unloading-pit-icon.png")
     icon((122, 90, 44, 255), (154, 138, 106, 255), belt).save("loading-station-icon.png")
     icon((180, 74, 42, 255), (110, 90, 58, 255), belt).save("belt-loader-icon.png")

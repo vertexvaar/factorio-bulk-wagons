@@ -11,10 +11,43 @@ local REDRAW_DISTANCE = 8 -- tiles the player moves before the markers are redra
 local SPRITE = "utility/rail_signal_placement_indicator"
 
 local bases = {}
-for _, base in pairs({ shared.pit, shared.loader, shared.belt_loader }) do
-  for variant = 1, shared.variant_count do
+for _, base in pairs(shared.all_bases) do
+  for variant = 1, shared.variant_count_of(base) do
     bases[shared.variant_name(base, variant)] = base
   end
+end
+
+local function straight_rail_along(surface, position, vertical)
+  local area = { { position.x - 0.5, position.y - 0.5 }, { position.x + 0.5, position.y + 0.5 } }
+  for _, rail in pairs(surface.find_entities_filtered({ type = "straight-rail", area = area })) do
+    local d = rail.direction
+    local rail_vertical = d == defines.direction.north or d == defines.direction.south
+    if rail_vertical == vertical and (rail_vertical or d == defines.direction.east or d == defines.direction.west) then
+      return true
+    end
+  end
+  return false
+end
+
+-- Bunker and silo: an indicator on every free wagon slot of the train stops nearby.
+local function slot_positions(surface, area)
+  local positions = {}
+  for _, stop in pairs(surface.find_entities_filtered({ type = "train-stop", area = area })) do
+    local d, s = stop.direction, stop.position
+    local vertical = d == defines.direction.north or d == defines.direction.south
+    if vertical or d == defines.direction.east or d == defines.direction.west then
+      -- the stop stands 2 tiles to the right of its track
+      local line
+      if d == defines.direction.north then line = { x = s.x - 2, y = s.y }
+      elseif d == defines.direction.south then line = { x = s.x + 2, y = s.y }
+      elseif d == defines.direction.east then line = { x = s.x, y = s.y - 2 }
+      else line = { x = s.x, y = s.y + 2 } end
+      for _, along in pairs(shared.wagon_slots(surface, line, vertical, 2.5)) do
+        positions[#positions + 1] = { position = vertical and { x = line.x, y = along } or { x = along, y = line.y }, vertical = vertical }
+      end
+    end
+  end
+  return positions
 end
 
 -- The station base name in the player's cursor (item or ghost), or nil.
@@ -41,6 +74,31 @@ local function draw(player, base)
   local objects = {}
   local area = { { p.x - RADIUS, p.y - RADIUS }, { p.x + RADIUS, p.y + RADIUS } }
   local seen = {}
+  if not shared.is_legacy(base) then
+    for _, slot in pairs(slot_positions(surface, { { p.x - 2 * RADIUS, p.y - 2 * RADIUS }, { p.x + 2 * RADIUS, p.y + 2 * RADIUS } })) do
+      local position, vertical = slot.position, slot.vertical
+      local key = position.x .. "," .. position.y
+      if not seen[key] and math.abs(position.x - p.x) <= RADIUS and math.abs(position.y - p.y) <= RADIUS then
+        seen[key] = true
+        local spec = { name = shared.variant_name(base, vertical and 1 or 2), position = position, force = player.force,
+          build_check_type = defines.build_check_type.manual }
+        if straight_rail_along(surface, position, vertical) and surface.can_place_entity(spec) then
+          objects[#objects + 1] = rendering.draw_sprite({
+            sprite = SPRITE,
+            orientation = vertical and 0 or 0.25,
+            x_scale = 2,
+            y_scale = 2,
+            surface = surface,
+            target = position,
+            players = { player },
+          })
+        end
+      end
+    end
+    storage.markers = storage.markers or {}
+    storage.markers[player.index] = { objects = objects, x = p.x, y = p.y, surface = surface.index, base = base }
+    return
+  end
   for _, rail in pairs(surface.find_entities_filtered({ type = "straight-rail", area = area })) do
     local d = rail.direction
     local vertical = d == defines.direction.north or d == defines.direction.south

@@ -9,8 +9,8 @@ data:extend({
     },
     effects = {
       { type = "unlock-recipe", recipe = shared.wagon },
-      { type = "unlock-recipe", recipe = shared.belt_loader },
-      { type = "unlock-recipe", recipe = shared.pit },
+      { type = "unlock-recipe", recipe = shared.bunker },
+      { type = "unlock-recipe", recipe = "bulk-connector" },
     },
     prerequisites = { "railway", "concrete" },
     unit = {
@@ -29,7 +29,7 @@ data:extend({
       { icon = "__base__/graphics/technology/railway.png", icon_size = 256, tint = { r = 0.7, g = 0.8, b = 1 } },
     },
     effects = {
-      { type = "unlock-recipe", recipe = shared.loader },
+      { type = "unlock-recipe", recipe = shared.silo },
     },
     prerequisites = { "bulk-wagons", "advanced-circuit" },
     unit = {
@@ -41,6 +41,18 @@ data:extend({
       time = 30,
     },
   },
+})
+
+-- The faster connectors come with the belt tier they run at.
+for _, def in pairs(shared.connectors) do
+  local tech = data.raw.technology[def.tech]
+  if def.tech ~= "bulk-wagons" and tech and data.raw.recipe[def.name] then
+    tech.effects = tech.effects or {}
+    table.insert(tech.effects, { type = "unlock-recipe", recipe = def.name })
+  end
+end
+
+data:extend({
   {
     type = "custom-input",
     name = "bulk-wagons-rotate",
