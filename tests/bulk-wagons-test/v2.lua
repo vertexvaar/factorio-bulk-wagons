@@ -70,6 +70,16 @@ function v2.setup(s, report_fn)
   end
   -- a connector off the long sides: next to the bunker's end, it must not count as docked
   s.end_connector = connector(surface, { xb + 2.5, -15 }, defines.direction.north, "output")
+  -- freshly built, before the loader linked up with the bunker (as when built by hand), both kinds
+  s.fresh_docked = true
+  for k, kind in pairs({ "input", "output" }) do
+    for _, dir in pairs({ defines.direction.east, defines.direction.west }) do
+      local fresh = surface.create_entity({ name = "bulk-connector", position = { xb - 4, -13.5 + k }, direction = dir, type = kind,
+        force = "player" })
+      s.fresh_docked = s.fresh_docked and fresh ~= nil and remote.call("bulk-wagons", "connector_docked", fresh)
+      if fresh then fresh.destroy() end
+    end
+  end
 
   -- silo over an empty halted wagon, filled by script
   local xs = X0 + 21
@@ -139,6 +149,7 @@ function v2.check(s)
     "connector without a belt holds the ore, nothing on the ground", held .. " held")
   report(s.out_east.loader_container ~= nil and s.out_east.loader_container == remote.call("bulk-wagons", "get_store", s.bunker),
     "connector docks onto the bunker inventory")
+  report(s.fresh_docked, "a connector counts as docked right when it is built, input or output, either way round")
   report(remote.call("bulk-wagons", "connector_docked", s.out_east) and not remote.call("bulk-wagons", "connector_docked", s.end_connector),
     "only the long sides count as docking points")
   -- collision: rim blocks the player, gratings and track do not

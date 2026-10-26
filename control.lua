@@ -8,6 +8,7 @@ local SWEEP_PERIOD = 60 -- ticks between checks for forbidden items in wagons
 local OPEN_GUI_PERIOD = 10 -- ticks between checks of wagons a player has open
 local PORT_NAMES = { [shared.port] = true, [shared.rail_port] = true }
 local STORE_NAMES = {}
+local STORE_LIST = {} -- filled on init/load with the names that exist
 for _, name in pairs(shared.station_window_names()) do
   STORE_NAMES[name] = true
 end
@@ -618,9 +619,25 @@ end
 
 -- Whether a connector docks onto a long side of a bunker or silo (the sides along
 -- the track; the ends belong to the track).
+-- The station a connector touches with either end: the loader only links up with its
+-- container a moment after it is built by hand (and its end depends on input/output),
+-- so this looks at the tiles just beyond both ends.
+local function touched_station(connector)
+  local d = connector.direction
+  local vertical = d == defines.direction.north or d == defines.direction.south
+  local p = connector.position
+  for _, s in pairs({ -1, 1 }) do
+    local x, y = p.x + (vertical and 0 or s * 1.5), p.y + (vertical and s * 1.5 or 0)
+    for _, store in pairs(connector.surface.find_entities_filtered({ name = STORE_LIST, area = { { x - 0.1, y - 0.1 }, { x + 0.1, y + 0.1 } } })) do
+      local record = storage.stations[storage.store_owner[store.unit_number] or 0]
+      if record then return record end
+    end
+  end
+end
+
 local function docked_connector(connector)
   local container = connector.loader_container
-  local record = container and storage.stations[storage.store_owner[container.unit_number] or 0]
+  local record = container and storage.stations[storage.store_owner[container.unit_number] or 0] or touched_station(connector)
   if not (record and record.entity.valid and not shared.is_legacy(record.base)) then return false end
   local p, c = record.entity.position, connector.position
   local across = shared.rail_is_vertical(record.variant) and math.abs(c.x - p.x) or math.abs(c.y - p.y)
@@ -954,6 +971,12 @@ end
 local function collect_wagon_names()
   for i = #wagon_names, 1, -1 do
     wagon_names[i] = nil
+  end
+  for i = #STORE_LIST, 1, -1 do
+    STORE_LIST[i] = nil
+  end
+  for name in pairs(STORE_NAMES) do
+    if exists(name) then STORE_LIST[#STORE_LIST + 1] = name end
   end
   for name in pairs(wagon_planet) do
     if exists(name) then wagon_names[#wagon_names + 1] = name end

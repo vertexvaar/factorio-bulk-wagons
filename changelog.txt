@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.3
+Date: 2026-10-26
+  Bugfixes:
+    - Connectors built by hand were refused on the long side of a bunker or silo: the check ran before the loader had linked up with the station. It now looks at the tiles at both ends of the connector.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.2
 Date: 2026-10-26
   Bugfixes:
