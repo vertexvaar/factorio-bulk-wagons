@@ -454,29 +454,36 @@ end
 -- A bunker or silo within this many tiles of a wagon slot of a train stop snaps onto it.
 local SLOT_SNAP = 3
 
-local function fit_station(entity, info, align)
+-- Where a station placed at position belongs: its variant turned to the rail below it
+-- and its position centred on that rail and snapped along it. ghosts: a rail ghost
+-- counts too (for station ghosts placed by hand).
+local function aligned(surface, position, info, ghosts)
   local variant = info.variant
-  local position = { entity.position.x, entity.position.y }
-  if align then
-    local rail, vertical = straight_rail_at(entity.surface, entity.position)
-    if rail then
-      if vertical ~= shared.rail_is_vertical(variant) then variant = variant % shared.variant_count_of(info.base) + 1 end
-      local along = math.floor((vertical and entity.position.y or entity.position.x) + 0.5)
-      if not shared.is_legacy(info.base) then
-        local best
-        for _, slot in pairs(shared.wagon_slots(entity.surface, entity.position, vertical, shared.wagon_pitch * shared.slot_count)) do
-          local d = math.abs(slot - along)
-          if d <= SLOT_SNAP and (not best or d < math.abs(best - along)) then best = slot end
-        end
-        along = best or along
+  local target = { position.x, position.y }
+  local rail, vertical = straight_rail_at(surface, position, ghosts)
+  if rail then
+    if vertical ~= shared.rail_is_vertical(variant) then variant = variant % shared.variant_count_of(info.base) + 1 end
+    local along = math.floor((vertical and position.y or position.x) + 0.5)
+    if not shared.is_legacy(info.base) then
+      local best
+      for _, slot in pairs(shared.wagon_slots(surface, position, vertical, shared.wagon_pitch * shared.slot_count)) do
+        local d = math.abs(slot - along)
+        if d <= SLOT_SNAP and (not best or d < math.abs(best - along)) then best = slot end
       end
-      if vertical then
-        position = { rail.position.x, along }
-      else
-        position = { along, rail.position.y }
-      end
+      along = best or along
+    end
+    if vertical then
+      target = { rail.position.x, along }
+    else
+      target = { along, rail.position.y }
     end
   end
+  return variant, target
+end
+
+local function fit_station(entity, info, align)
+  local variant, position = info.variant, { entity.position.x, entity.position.y }
+  if align then variant, position = aligned(entity.surface, entity.position, info, false) end
   local name = shared.variant_name(info.base, variant, planet_of(entity.surface))
   if not exists(name) then name = shared.variant_name(info.base, variant) end
   if name == entity.name and position[1] == entity.position.x and position[2] == entity.position.y then
@@ -620,6 +627,23 @@ local function docked_connector(connector)
   return across > shared.station_half
 end
 
+-- Moves a station ghost to where a hand-built station would go (see aligned). Returns
+-- the ghost now standing there; one that does not fit there stays where it is.
+local function snap_ghost(ghost)
+  local info = variant_of[ghost.ghost_name]
+  local variant, position = aligned(ghost.surface, ghost.position, info, true)
+  local name = shared.variant_name(info.base, variant)
+  if name == ghost.ghost_name and position[1] == ghost.position.x and position[2] == ghost.position.y then return ghost end
+  local surface, force, quality, tags = ghost.surface, ghost.force, ghost.quality, ghost.tags
+  local original = { name = "entity-ghost", inner_name = ghost.ghost_name, position = ghost.position, force = force,
+    quality = quality, tags = tags }
+  ghost.destroy()
+  local spec = { name = "entity-ghost", inner_name = name, position = position, force = force, quality = quality, tags = tags }
+  local moved = surface.can_place_entity({ name = name, position = position, force = force,
+    build_check_type = defines.build_check_type.manual_ghost }) and surface.create_entity(spec)
+  return moved or surface.create_entity(original)
+end
+
 -- Ghosts of stations placed off the rails disappear again.
 local function check_ghosts()
   if not next(storage.ghost_checks) then return end
@@ -629,6 +653,8 @@ local function check_ghosts()
       local player = game.get_player(check.player_index)
       if player then player.create_local_flying_text({ text = { "bulk-wagons.needs-rail" }, position = ghost.position }) end
       ghost.destroy()
+    elseif ghost.valid and check.snap then
+      snap_ghost(ghost)
     end
   end
   storage.ghost_checks = {}
@@ -657,8 +683,14 @@ local function on_built(event)
     return
   end
   if entity.name == "entity-ghost" and variant_of[entity.ghost_name] and event.name == defines.events.on_built_entity then
-    -- checked a tick later, when the rails of the same blueprint exist as well
-    storage.ghost_checks[#storage.ghost_checks + 1] = { ghost = entity, player_index = event.player_index }
+    -- checked a tick later, when the rails of the same blueprint exist as well. A ghost
+    -- placed from the item (not from a blueprint, which keeps its layout) also snaps into
+    -- place like a station built by hand, so robots build it there.
+    local stack = event.stack
+    local from_blueprint = event.record ~= nil
+      or stack and stack.valid_for_read and (stack.is_blueprint or stack.is_blueprint_book)
+    storage.ghost_checks[#storage.ghost_checks + 1] =
+      { ghost = entity, player_index = event.player_index, snap = not from_blueprint }
     return
   end
   local info = variant_of[entity.name]
@@ -1298,6 +1330,8 @@ remote.add_interface("bulk-wagons", {
   end,
   -- Replaces the legacy stations in area by bunkers and silos, as the 0.4.0 update does.
   migrate_legacy = function(area) migrate_legacy(area) end,
+  -- Moves a station ghost where a hand-placed ghost snaps to; returns the ghost there.
+  snap_ghost = function(ghost) return snap_ghost(ghost) end,
   -- Takes spilled bulk goods around the bunkers and silos in area back in, as the 0.4.1 update does.
   recover_spilled = function(area) recover_spilled(area) end,
   -- Whether a connector docks onto a long side of a bunker or silo.

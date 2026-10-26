@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.2
+Date: 2026-10-26
+  Bugfixes:
+    - Station ghosts placed from the item snap onto the wagon slot and turn to the rail like a station built by hand, so robots build them in the right place. Ghosts from blueprints keep their layout.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.1
 Date: 2026-10-26
   Bugfixes:

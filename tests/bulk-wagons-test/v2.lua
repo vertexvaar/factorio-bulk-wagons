@@ -100,6 +100,13 @@ function v2.setup(s, report_fn)
 end
 
 function v2.after_setup(s)
+  -- a ghost placed by hand a bit off the wagon slot, turned the wrong way: robots must build it on the slot
+  local surface = game.surfaces.nauvis
+  local xg = X0 + 61
+  rails(surface, xg, -41, 41)
+  stop(surface, xg, -21, "Ghost")
+  local ghost = surface.create_entity({ name = "entity-ghost", inner_name = "bulk-loading-silo-2", position = { xg, -9 }, force = "player" })
+  s.ghost = remote.call("bulk-wagons", "snap_ghost", ghost)
   -- goods spilled around the silo, as the 0.4.0 update did, come back in
   local surface = game.surfaces.nauvis
   s.recovered_before = remote.call("bulk-wagons", "get_inventory", s.silo).get_item_count("coal")
@@ -112,6 +119,10 @@ end
 
 function v2.check(s)
   local surface = game.surfaces.nauvis
+  local g = s.ghost
+  report(g and g.valid and g.ghost_name == "bulk-loading-silo" and g.position.x == X0 + 61 and g.position.y == -11,
+    "a hand-placed ghost snaps onto the wagon slot and turns to the rail",
+    g and g.valid and (g.ghost_name .. " " .. serpent.line(g.position)) or "gone")
   local xb = X0 + 1
   report(s.bunker and s.bunker.valid and s.bunker.position.y == -11 and s.bunker.position.x == xb,
     "bunker snaps onto the wagon slot of the train stop", s.bunker and s.bunker.valid and serpent.line(s.bunker.position) or "gone")
