@@ -71,7 +71,7 @@ function v2.setup(s, report_fn)
       direction = defines.direction.east, force = "player" })
   end
   -- a connector off the rim: next to the bunker's end, it must not count as docked
-  s.end_connector = connector(surface, { xb + 2.5, -15 }, defines.direction.north, "output")
+  s.end_connector = connector(surface, { xb + 2.5, -15.5 }, defines.direction.north, "output")
   -- whichever way it is built, the arrow decides: away from the station = output; along
   -- the track the bunker's way (output)
   s.arrow_ok = true

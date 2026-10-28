@@ -721,7 +721,9 @@ local function fit_connector(entity, station, side)
     direction = kind == "output" and outward or OPPOSITE[outward]
   end
   local name = shared.connector_name(info.def, station.base)
-  if name ~= entity.name then
+  -- a loader cannot be turned by script (writing its type flips it), so a connector that
+  -- needs another look or direction is built anew in its place
+  if name ~= entity.name or direction ~= entity.direction then
     local spec = { name = name, position = entity.position, direction = direction, type = kind, force = entity.force,
       quality = entity.quality, create_build_effect_smoke = false }
     -- created over the old one, which then gives way
@@ -730,9 +732,8 @@ local function fit_connector(entity, station, side)
     copy_loader(entity, created)
     entity.destroy()
     entity = created
-  else
-    if entity.loader_type ~= kind then entity.loader_type = kind end
-    if entity.direction ~= direction then entity.direction = direction end
+  elseif entity.loader_type ~= kind then
+    entity.loader_type = kind
   end
   entity.update_connections()
   return entity
@@ -752,6 +753,7 @@ end
 
 -- Whether a connector stands on the rim of a bunker or silo and is linked to its inventory.
 local function docked_connector(connector)
+  if not (connector and connector.valid) then return false end
   local station = station_at(connector.surface, connector.position, false)
   if not (station and shared.rim_side(station.position, station.base, station.variant, connector.position)) then
     return false
