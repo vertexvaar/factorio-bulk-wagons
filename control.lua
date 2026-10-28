@@ -681,27 +681,61 @@ local function connector_spot(surface, position, ghosts, except)
   return station, side
 end
 
--- Copies filters, circuit settings and wires from one loader to another.
+-- Filters, circuit settings and wires of a loader, to put onto the one that replaces it
+-- (two loaders cannot share a tile, so the old one goes first).
 local CONTROL_KEYS = { "circuit_enable_disable", "circuit_condition", "connect_to_logistic_network", "logistic_condition",
   "circuit_read_transfers", "circuit_set_filters" }
-local function copy_loader(from, to)
-  pcall(function() to.loader_filter_mode = from.loader_filter_mode end)
-  for i = 1, math.min(from.filter_slot_count, to.filter_slot_count) do
-    local filter = from.get_filter(i)
-    if filter then pcall(to.set_filter, i, filter) end
+local function save_loader(entity)
+  local saved = { mode = entity.loader_filter_mode, filters = {}, behavior = {}, wires = {} }
+  for i = 1, entity.filter_slot_count do
+    saved.filters[i] = entity.get_filter(i)
   end
-  local behavior = from.get_control_behavior()
+  local behavior = entity.get_control_behavior()
   if behavior then
-    local target = to.get_or_create_control_behavior()
     for _, key in pairs(CONTROL_KEYS) do
-      pcall(function() target[key] = behavior[key] end)
+      pcall(function() saved.behavior[key] = behavior[key] end)
     end
   end
-  for id, connector in pairs(from.get_wire_connectors(false)) do
+  for id, connector in pairs(entity.get_wire_connectors(false)) do
     for _, connection in pairs(connector.connections) do
-      pcall(function() to.get_wire_connector(id, true).connect_to(connection.target, false, connection.origin) end)
+      saved.wires[#saved.wires + 1] = { id = id, target = connection.target, origin = connection.origin }
     end
   end
+  return saved
+end
+
+local function restore_loader(entity, saved)
+  pcall(function() entity.loader_filter_mode = saved.mode end)
+  for i, filter in pairs(saved.filters) do
+    pcall(entity.set_filter, i, filter)
+  end
+  if next(saved.behavior) then
+    local behavior = entity.get_or_create_control_behavior()
+    for key, value in pairs(saved.behavior) do
+      pcall(function() behavior[key] = value end)
+    end
+  end
+  for _, wire in pairs(saved.wires) do
+    pcall(function()
+      if wire.target.valid then entity.get_wire_connector(wire.id, true).connect_to(wire.target, false, wire.origin) end
+    end)
+  end
+end
+
+-- Replaces a loader by a new one built from spec, with its settings. If spec does not
+-- fit, the old one comes back. Returns the loader standing there.
+local function rebuild_loader(old, spec)
+  local surface, saved = old.surface, save_loader(old)
+  local back = { name = old.name, position = old.position, direction = old.direction, type = old.loader_type,
+    force = old.force, quality = old.quality, create_build_effect_smoke = false }
+  spec.force, spec.quality, spec.create_build_effect_smoke = old.force, old.quality, false
+  old.destroy()
+  local created = surface.create_entity(spec) or surface.create_entity(back)
+  if created then
+    restore_loader(created, saved)
+    created.update_connections()
+  end
+  return created
 end
 
 -- Turns a connector across its side, belt outward: the arrow decides the way the goods
@@ -721,19 +755,10 @@ local function fit_connector(entity, station, side)
     direction = kind == "output" and outward or OPPOSITE[outward]
   end
   local name = shared.connector_name(info.def, station.base)
-  -- a loader cannot be turned by script (writing its type flips it), so a connector that
-  -- needs another look or direction is built anew in its place
-  if name ~= entity.name or direction ~= entity.direction then
-    local spec = { name = name, position = entity.position, direction = direction, type = kind, force = entity.force,
-      quality = entity.quality, create_build_effect_smoke = false }
-    -- created over the old one, which then gives way
-    local created = entity.surface.create_entity(spec)
-    if not created then return entity end
-    copy_loader(entity, created)
-    entity.destroy()
-    entity = created
-  elseif entity.loader_type ~= kind then
-    entity.loader_type = kind
+  -- writing a loader's type also turns it round, and it does not turn sideways, so a
+  -- connector that needs another look, direction or type is built anew in its place
+  if name ~= entity.name or direction ~= entity.direction or kind ~= entity.loader_type then
+    return rebuild_loader(entity, { name = name, position = entity.position, direction = direction, type = kind })
   end
   entity.update_connections()
   return entity
@@ -791,8 +816,7 @@ local function migrate_connector(old)
     end
   end
   local outer = math.abs(across) + 0.5 -- the old connector's far tile
-  local spec = { name = shared.connector_name(info.def, station.base), position = at(edge), direction = d, type = kind,
-    force = force, quality = quality, create_build_effect_smoke = false }
+  local spec = { name = shared.connector_name(info.def, station.base), position = at(edge), direction = d, type = kind }
   -- the rim tile must be free apart from the old connector (the bunker grew under it)
   local box = { { spec.position.x - 0.4, spec.position.y - 0.4 }, { spec.position.x + 0.4, spec.position.y + 0.4 } }
   for _, other in pairs(surface.find_entities_filtered({ area = box, collision_mask = "object" })) do
@@ -801,15 +825,12 @@ local function migrate_connector(old)
       return false
     end
   end
-  -- created over the old one, so settings and wires can be copied
-  local created = surface.create_entity(spec)
-  if not created then return false end
-  copy_loader(old, created)
-  old.destroy()
+  local created = rebuild_loader(old, spec)
+  if not (created and created.name == spec.name) then return false end
   created = fit_connector(created, station, side)
   -- belts over the tiles the old connector covered beyond the rim
   local outward = shared.outward(station.variant, side)
-  local flow = created.valid and created.loader_type == "output" and outward or OPPOSITE[outward]
+  local flow = created and created.valid and created.loader_type == "output" and outward or OPPOSITE[outward]
   for a = edge + 1, outer, 1 do
     local belt = { name = info.def.belt, position = at(a), direction = flow, force = force, create_build_effect_smoke = false }
     if surface.can_place_entity(belt) then surface.create_entity(belt) end
