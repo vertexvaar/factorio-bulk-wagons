@@ -190,10 +190,18 @@ local SPRITE_KEY = { [shared.pit] = "e1", [shared.belt_loader] = "b3", [shared.l
 -- the bunker's moving parts stand beside the track, under the wagons
 local OVERLAY_LAYER = { e1 = "rail-chain-signal-metal", b3 = "higher-object-under", b1 = "higher-object-under",
   bunker = "lower-object-above-shadow", silo = "higher-object-under" }
+-- connector entity name -> { def, base }; the 2x1 connectors of 0.4 have no base
 local CONNECTORS = {}
 for _, def in pairs(shared.connectors) do
-  CONNECTORS[def.name] = true
+  CONNECTORS[def.name] = { def = def, legacy = true }
+  for _, base in pairs(shared.station_bases) do
+    CONNECTORS[shared.connector_name(def, base)] = { def = def, base = base }
+  end
 end
+local CONNECTOR_LIST = {} -- 1x1 connector names that exist, filled on init/load
+local LEGACY_CONNECTOR_LIST = {}
+local STATION_LIST = {} -- bunker and silo names that exist
+local dock_connectors -- defined with the connectors below
 -- just above the station picture ("lower-object-above-shadow")
 local BASE_MASK_LAYER = "lower-object-overlay"
 local ANIMATION_SPEED = 0.25
@@ -363,6 +371,7 @@ local function register_station(entity, info)
   circuit.attach(record)
   if record.store then circuit.on_any_built(record.store) end
   draw_station(record)
+  if not legacy then dock_connectors(record) end
   return record
 end
 
@@ -401,6 +410,22 @@ local function remove_station(unit_number, buffer, removing)
   end
   for _, blocker in pairs(record.blockers or {}) do
     if blocker.valid then blocker.destroy() end
+  end
+  -- mined: the connectors on its rim come along
+  if buffer and record.entity.valid and not shared.is_legacy(record.base) then
+    local e = record.entity
+    for _, tile in pairs(shared.rim_tiles(e.position, record.base, record.variant)) do
+      local area = { { tile.x - 0.1, tile.y - 0.1 }, { tile.x + 0.1, tile.y + 0.1 } }
+      for _, connector in pairs(e.surface.find_entities_filtered({ name = CONNECTOR_LIST, area = area })) do
+        for i = 1, connector.get_max_transport_line_index() do
+          for _, item in pairs(connector.get_transport_line(i).get_contents()) do
+            buffer.insert({ name = item.name, count = item.count, quality = item.quality })
+          end
+        end
+        buffer.insert({ name = CONNECTORS[connector.name].def.name, count = 1, quality = connector.quality })
+        connector.destroy()
+      end
+    end
   end
   if record.entity.valid and record.entity ~= removing then record.entity.destroy() end
 end
@@ -617,31 +642,229 @@ local function refuse(entity, info, player, message)
   if inserted == 0 then surface.spill_item_stack({ position = position, stack = stack }) end
 end
 
--- Whether a connector docks onto a long side of a bunker or silo (the sides along
--- the track; the ends belong to the track).
--- The station a connector touches with either end: the loader only links up with its
--- container a moment after it is built by hand (and its end depends on input/output),
--- so this looks at the tiles just beyond both ends.
-local function touched_station(connector)
-  local d = connector.direction
-  local vertical = d == defines.direction.north or d == defines.direction.south
-  local p = connector.position
-  for _, s in pairs({ -1, 1 }) do
-    local x, y = p.x + (vertical and 0 or s * 1.5), p.y + (vertical and s * 1.5 or 0)
-    for _, store in pairs(connector.surface.find_entities_filtered({ name = STORE_LIST, area = { { x - 0.1, y - 0.1 }, { x + 0.1, y + 0.1 } } })) do
-      local record = storage.stations[storage.store_owner[store.unit_number] or 0]
-      if record then return record end
+--------------------------------------------------------------------------------
+-- Connectors: 1x1 loaders on the rim tiles of the long sides of a bunker or silo
+
+-- The bunker or silo whose footprint covers position: { position, base, variant, record }.
+-- ghosts: a station ghost counts too (without record).
+local function station_at(surface, position, ghosts)
+  local area = { { position.x - 0.1, position.y - 0.1 }, { position.x + 0.1, position.y + 0.1 } }
+  for _, store in pairs(surface.find_entities_filtered({ name = STORE_LIST, area = area })) do
+    local record = storage.stations[storage.store_owner[store.unit_number] or 0]
+    if record and record.entity.valid and not shared.is_legacy(record.base) then
+      return { position = record.entity.position, base = record.base, variant = record.variant, record = record }
+    end
+  end
+  if not ghosts then return end
+  local near = { { position.x - 4.5, position.y - 4.5 }, { position.x + 4.5, position.y + 4.5 } }
+  for _, ghost in pairs(surface.find_entities_filtered({ ghost_name = STATION_LIST, area = near })) do
+    local info = variant_of[ghost.ghost_name]
+    local size = shared.station_size[info.base]
+    local hw, hh = size[1] / 2, size[2] / 2
+    if not shared.rail_is_vertical(info.variant) then hw, hh = hh, hw end
+    local g = ghost.position
+    if math.abs(position.x - g.x) < hw and math.abs(position.y - g.y) < hh then
+      return { position = g, base = info.base, variant = info.variant }
     end
   end
 end
 
+-- Where a connector at position may stand: the station and the side, or nil and why not.
+-- except: the connector itself, left out of the count of its side.
+local function connector_spot(surface, position, ghosts, except)
+  local station = station_at(surface, position, ghosts)
+  local side = station and shared.rim_side(station.position, station.base, station.variant, position)
+  if not side then return nil, nil, "bulk-wagons.needs-station" end
+  local count =
+    shared.connectors_on_side(surface, station.position, station.base, station.variant, side, CONNECTOR_LIST, except)
+  if count >= shared.connectors_per_side then return nil, nil, "bulk-wagons.side-full" end
+  return station, side
+end
+
+-- Copies filters, circuit settings and wires from one loader to another.
+local CONTROL_KEYS = { "circuit_enable_disable", "circuit_condition", "connect_to_logistic_network", "logistic_condition",
+  "circuit_read_transfers", "circuit_set_filters" }
+local function copy_loader(from, to)
+  pcall(function() to.loader_filter_mode = from.loader_filter_mode end)
+  for i = 1, math.min(from.filter_slot_count, to.filter_slot_count) do
+    local filter = from.get_filter(i)
+    if filter then pcall(to.set_filter, i, filter) end
+  end
+  local behavior = from.get_control_behavior()
+  if behavior then
+    local target = to.get_or_create_control_behavior()
+    for _, key in pairs(CONTROL_KEYS) do
+      pcall(function() target[key] = behavior[key] end)
+    end
+  end
+  for id, connector in pairs(from.get_wire_connectors(false)) do
+    for _, connection in pairs(connector.connections) do
+      pcall(function() to.get_wire_connector(id, true).connect_to(connection.target, false, connection.origin) end)
+    end
+  end
+end
+
+-- Turns a connector across its side, belt outward: the arrow decides the way the goods
+-- go (pointing away from the station: output). One built along the track does what its
+-- station does. It also takes the look of its station (elevator or chute). Returns the
+-- connector, which may be a new entity.
+local function fit_connector(entity, station, side)
+  local info = CONNECTORS[entity.name]
+  local outward = shared.outward(station.variant, side)
+  local direction, kind = entity.direction, nil
+  if direction == outward then
+    kind = "output"
+  elseif direction == OPPOSITE[outward] then
+    kind = "input"
+  else
+    kind = UNLOADS[station.base] and "output" or "input"
+    direction = kind == "output" and outward or OPPOSITE[outward]
+  end
+  local name = shared.connector_name(info.def, station.base)
+  if name ~= entity.name then
+    local spec = { name = name, position = entity.position, direction = direction, type = kind, force = entity.force,
+      quality = entity.quality, create_build_effect_smoke = false }
+    -- created over the old one, which then gives way
+    local created = entity.surface.create_entity(spec)
+    if not created then return entity end
+    copy_loader(entity, created)
+    entity.destroy()
+    entity = created
+  else
+    if entity.loader_type ~= kind then entity.loader_type = kind end
+    if entity.direction ~= direction then entity.direction = direction end
+  end
+  entity.update_connections()
+  return entity
+end
+
+-- Fits the connectors already standing on a station's rim (built before it, or by
+-- robots ahead of it).
+dock_connectors = function(record)
+  local e = record.entity
+  for _, tile in pairs(shared.rim_tiles(e.position, record.base, record.variant)) do
+    local area = { { tile.x - 0.1, tile.y - 0.1 }, { tile.x + 0.1, tile.y + 0.1 } }
+    for _, connector in pairs(e.surface.find_entities_filtered({ name = CONNECTOR_LIST, area = area })) do
+      fit_connector(connector, { position = e.position, base = record.base, variant = record.variant }, tile.side)
+    end
+  end
+end
+
+-- Whether a connector stands on the rim of a bunker or silo and is linked to its inventory.
 local function docked_connector(connector)
-  local container = connector.loader_container
-  local record = container and storage.stations[storage.store_owner[container.unit_number] or 0] or touched_station(connector)
-  if not (record and record.entity.valid and not shared.is_legacy(record.base)) then return false end
-  local p, c = record.entity.position, connector.position
-  local across = shared.rail_is_vertical(record.variant) and math.abs(c.x - p.x) or math.abs(c.y - p.y)
-  return across > shared.station_half
+  local station = station_at(connector.surface, connector.position, false)
+  if not (station and shared.rim_side(station.position, station.base, station.variant, connector.position)) then
+    return false
+  end
+  return connector.loader_container ~= nil and connector.loader_container == station.record.store
+end
+
+-- 0.5.0: a 2x1 connector of 0.4 beside a station becomes a 1x1 one on the station's rim
+-- in the same row, with the same settings; belts of its tier fill the tiles it leaves.
+local function migrate_connector(old)
+  local info = CONNECTORS[old.name]
+  local p, d = old.position, old.direction
+  local axis_vertical = d == defines.direction.north or d == defines.direction.south
+  local station
+  for _, s in pairs({ -1.5, -0.5, 0.5, 1.5 }) do
+    local q = { x = p.x + (axis_vertical and 0 or s), y = p.y + (axis_vertical and s or 0) }
+    station = station_at(old.surface, q, false)
+    if station then break end
+  end
+  if not station then return false end
+  local vertical = shared.rail_is_vertical(station.variant)
+  if vertical == axis_vertical then return false end
+  local c = station.position
+  local across, along = vertical and p.x - c.x or p.y - c.y, vertical and p.y - c.y or p.x - c.x
+  if math.abs(along) > shared.station_half then return false end
+  local side = across > 0 and 1 or -1
+  local edge = shared.half_across(station.base) - 0.5
+  local function at(a) return vertical and { x = c.x + side * a, y = p.y } or { x = p.x, y = c.y + side * a } end
+
+  local surface, force, quality, kind = old.surface, old.force, old.quality, old.loader_type
+  local items = {}
+  for i = 1, old.get_max_transport_line_index() do
+    for _, item in pairs(old.get_transport_line(i).get_contents()) do
+      items[#items + 1] = item
+    end
+  end
+  local outer = math.abs(across) + 0.5 -- the old connector's far tile
+  local spec = { name = shared.connector_name(info.def, station.base), position = at(edge), direction = d, type = kind,
+    force = force, quality = quality, create_build_effect_smoke = false }
+  -- the rim tile must be free apart from the old connector (the bunker grew under it)
+  local box = { { spec.position.x - 0.4, spec.position.y - 0.4 }, { spec.position.x + 0.4, spec.position.y + 0.4 } }
+  for _, other in pairs(surface.find_entities_filtered({ area = box, collision_mask = "object" })) do
+    if other ~= old then
+      log("bulk-wagons: no room to move a connector onto the station rim at " .. serpent.line(spec.position))
+      return false
+    end
+  end
+  -- created over the old one, so settings and wires can be copied
+  local created = surface.create_entity(spec)
+  if not created then return false end
+  copy_loader(old, created)
+  old.destroy()
+  created = fit_connector(created, station, side)
+  -- belts over the tiles the old connector covered beyond the rim
+  local outward = shared.outward(station.variant, side)
+  local flow = created.valid and created.loader_type == "output" and outward or OPPOSITE[outward]
+  for a = edge + 1, outer, 1 do
+    local belt = { name = info.def.belt, position = at(a), direction = flow, force = force, create_build_effect_smoke = false }
+    if surface.can_place_entity(belt) then surface.create_entity(belt) end
+  end
+  -- what was on the old connector's belt goes into the station
+  local store = station.record.store
+  local inventory = store and store.valid and store.get_inventory(defines.inventory.chest)
+  for _, item in pairs(items) do
+    local left = item.count - (inventory and inventory.insert({ name = item.name, count = item.count, quality = item.quality }) or 0)
+    if left > 0 then
+      surface.spill_item_stack({ position = spec.position, stack = { name = item.name, count = left, quality = item.quality },
+        enable_looted = true, force = force, allow_belts = false })
+    end
+  end
+  return true
+end
+
+local function migrate_connectors()
+  if #LEGACY_CONNECTOR_LIST == 0 then return end
+  local moved, kept = 0, 0
+  for _, surface in pairs(game.surfaces) do
+    for _, old in pairs(surface.find_entities_filtered({ name = LEGACY_CONNECTOR_LIST })) do
+      if old.valid and migrate_connector(old) then moved = moved + 1 else kept = kept + 1 end
+    end
+  end
+  if moved + kept > 0 then log("bulk-wagons: moved " .. moved .. " connectors onto station rims, kept " .. kept) end
+end
+
+-- Connectors built by hand go only onto a free rim tile of a bunker or silo (or of a
+-- station ghost); robots build them where their checked ghost stood.
+local function on_connector_built(entity, event)
+  local info = CONNECTORS[entity.name]
+  local player = event.player_index and game.get_player(event.player_index)
+  if info.legacy then
+    -- from an old blueprint: moved onto the rim like on update
+    if not migrate_connector(entity) and event.name == defines.events.on_built_entity then
+      refuse(entity, { base = info.def.name }, player, "bulk-wagons.needs-station")
+    end
+    return
+  end
+  local by_hand = event.name == defines.events.on_built_entity
+  local station, side, why = connector_spot(entity.surface, entity.position, not by_hand, entity)
+  if not station then
+    if by_hand then refuse(entity, { base = info.def.name }, player, why) end
+    return
+  end
+  if station.record then fit_connector(entity, station, side) end
+end
+
+-- Connector ghosts placed by hand or from a blueprint: checked a tick later, when the
+-- station ghosts of the same blueprint exist as well. Ghosts off a rim or on a full side
+-- disappear again.
+local function check_connector_ghost(ghost, player)
+  local station, _, why = connector_spot(ghost.surface, ghost.position, true, ghost)
+  if station then return end
+  if player then player.create_local_flying_text({ text = { why }, position = ghost.position }) end
+  ghost.destroy()
 end
 
 -- Moves a station ghost to where a hand-built station would go (see aligned). Returns
@@ -666,7 +889,9 @@ local function check_ghosts()
   if not next(storage.ghost_checks) then return end
   for _, check in pairs(storage.ghost_checks) do
     local ghost = check.ghost
-    if ghost.valid and not straight_rail_at(ghost.surface, ghost.position, true) then
+    if check.connector then
+      if ghost.valid then check_connector_ghost(ghost, game.get_player(check.player_index)) end
+    elseif ghost.valid and not straight_rail_at(ghost.surface, ghost.position, true) then
       local player = game.get_player(check.player_index)
       if player then player.create_local_flying_text({ text = { "bulk-wagons.needs-rail" }, position = ghost.position }) end
       ghost.destroy()
@@ -688,10 +913,11 @@ local function on_built(event)
   end
   local cloned = event.destination ~= nil
   if CONNECTORS[entity.name] then
-    -- a connector built by hand must dock onto the long side of a bunker or silo
-    if event.name == defines.events.on_built_entity and not docked_connector(entity) then
-      refuse(entity, { base = entity.name }, game.get_player(event.player_index), "bulk-wagons.needs-station")
-    end
+    if not cloned then on_connector_built(entity, event) end
+    return
+  end
+  if entity.name == "entity-ghost" and CONNECTORS[entity.ghost_name] and event.name == defines.events.on_built_entity then
+    storage.ghost_checks[#storage.ghost_checks + 1] = { ghost = entity, player_index = event.player_index, connector = true }
     return
   end
   if is_wagon(entity) then
@@ -981,6 +1207,20 @@ local function collect_wagon_names()
   for name in pairs(wagon_planet) do
     if exists(name) then wagon_names[#wagon_names + 1] = name end
   end
+  for _, list in pairs({ CONNECTOR_LIST, LEGACY_CONNECTOR_LIST, STATION_LIST }) do
+    for i = #list, 1, -1 do
+      list[i] = nil
+    end
+  end
+  for name, info in pairs(CONNECTORS) do
+    if exists(name) then
+      local list = info.legacy and LEGACY_CONNECTOR_LIST or CONNECTOR_LIST
+      list[#list + 1] = name
+    end
+  end
+  for name, info in pairs(variant_of) do
+    if not shared.is_legacy(info.base) and exists(name) then STATION_LIST[#STATION_LIST + 1] = name end
+  end
 end
 
 local function rescan()
@@ -1205,6 +1445,18 @@ local function migrate_legacy(area)
   if done + kept > 0 then log("bulk-wagons: replaced " .. done .. " wagon stations, kept " .. kept) end
 end
 
+-- 0.5.0: the bunker grew to 8 tiles across; its blockers move out to the new rim.
+local function refit_blockers()
+  for _, record in pairs(storage.stations) do
+    if not shared.is_legacy(record.base) and record.entity.valid then
+      for _, blocker in pairs(record.blockers or {}) do
+        if blocker.valid then blocker.destroy() end
+      end
+      record.blockers = create_blockers(record.entity, record)
+    end
+  end
+end
+
 script.on_init(function()
   collect_wagon_names()
   init_storage()
@@ -1222,6 +1474,8 @@ script.on_configuration_changed(function()
   rescan()
   migrate_legacy()
   recover_spilled()
+  refit_blockers()
+  migrate_connectors()
 end)
 
 script.on_event(defines.events.on_runtime_mod_setting_changed, function(event)
@@ -1357,8 +1611,15 @@ remote.add_interface("bulk-wagons", {
   snap_ghost = function(ghost) return snap_ghost(ghost) end,
   -- Takes spilled bulk goods around the bunkers and silos in area back in, as the 0.4.1 update does.
   recover_spilled = function(area) recover_spilled(area) end,
-  -- Whether a connector docks onto a long side of a bunker or silo.
+  -- Whether a connector stands on the rim of a bunker or silo, linked to its inventory.
   connector_docked = function(entity) return docked_connector(entity) end,
+  -- Whether a connector may go to position: true, or the locale key of the reason.
+  connector_allowed = function(surface, position)
+    local station, _, why = connector_spot(surface, position, true)
+    return station and true or why
+  end,
+  -- Moves the 2x1 connectors of 0.4 onto the station rims, as the 0.5.0 update does.
+  migrate_connectors = function() migrate_connectors() end,
   -- Turns and centres a station on the rail below it, as a hand-built one would be.
   align_station = function(entity)
     local info = entity and entity.valid and variant_of[entity.name]

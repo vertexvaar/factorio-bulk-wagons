@@ -1,5 +1,7 @@
 -- Placement markers: while a player holds a station, every free spot on a straight
--- rail nearby gets the game's rail signal placement indicator. The engine draws those
+-- rail nearby gets the game's rail signal placement indicator; while they hold a
+-- connector, every free rim tile of the bunkers and silos nearby (on sides that still
+-- take one). The engine draws those
 -- only for its own signals, so the script draws the same sprite, for that player only
 -- and only while the station is in the cursor, so idle players cost nothing.
 local shared = require("shared")
@@ -50,6 +52,30 @@ local function slot_positions(surface, area)
   return positions
 end
 
+local connector_items = {}
+for _, def in pairs(shared.connectors) do
+  connector_items[def.name] = def
+end
+-- Connector entity names that exist (known once the game runs).
+local connector_names
+local function existing_connectors()
+  if not connector_names then
+    connector_names = {}
+    for _, name in pairs(shared.connector_names()) do
+      if prototypes.entity[name] then connector_names[#connector_names + 1] = name end
+    end
+  end
+  return connector_names
+end
+
+-- The connector tier (its shared.connectors entry) in the player's cursor, or nil.
+local function held_connector(player)
+  local stack = player.cursor_stack
+  if stack and stack.valid_for_read then return connector_items[stack.name] end
+  local ghost = player.cursor_ghost
+  if ghost then return connector_items[ghost.name.name] end
+end
+
 -- The station base name in the player's cursor (item or ghost), or nil.
 local function held_station(player)
   local stack = player.cursor_stack
@@ -67,8 +93,47 @@ local function clear(index)
   storage.markers[index] = nil
 end
 
+local function draw_connectors(player, def)
+  local surface, p = player.surface, player.position
+  local names = existing_connectors()
+  local objects = {}
+  for _, record in pairs(storage.stations or {}) do
+    local e = record.entity
+    if e.valid and not shared.is_legacy(record.base) and e.surface == surface
+      and math.abs(e.position.x - p.x) <= RADIUS and math.abs(e.position.y - p.y) <= RADIUS
+    then
+      local open = {}
+      for _, side in pairs({ -1, 1 }) do
+        open[side] = shared.connectors_on_side(surface, e.position, record.base, record.variant, side, names)
+          < shared.connectors_per_side
+      end
+      for _, tile in pairs(shared.rim_tiles(e.position, record.base, record.variant)) do
+        local spec = { name = shared.connector_name(def, record.base), position = tile, force = player.force,
+          direction = shared.outward(record.variant, tile.side), build_check_type = defines.build_check_type.manual }
+        if open[tile.side] and prototypes.entity[spec.name] and surface.can_place_entity(spec) then
+          objects[#objects + 1] = rendering.draw_sprite({
+            sprite = SPRITE,
+            orientation = shared.rail_is_vertical(record.variant) and 0.25 or 0,
+            surface = surface,
+            target = { x = tile.x, y = tile.y },
+            players = { player },
+          })
+        end
+      end
+    end
+  end
+  return objects
+end
+
 local function draw(player, base)
   clear(player.index)
+  if type(base) == "table" then
+    -- a connector tier
+    storage.markers = storage.markers or {}
+    storage.markers[player.index] = { objects = draw_connectors(player, base), x = player.position.x,
+      y = player.position.y, surface = player.surface.index, base = base }
+    return
+  end
   local surface = player.surface
   local p = player.position
   local objects = {}
@@ -137,7 +202,7 @@ end
 -- Cursor changed: start, switch or stop the markers.
 function markers.refresh(player_index)
   local player = game.get_player(player_index)
-  local base = player and player.connected and held_station(player)
+  local base = player and player.connected and (held_station(player) or held_connector(player))
   if base then
     draw(player, base)
   else

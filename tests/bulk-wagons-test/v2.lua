@@ -1,5 +1,6 @@
 -- Tests for the 0.4.0 stations: unloading bunker, loading silo, connectors, wagon
--- slots at train stops and the migration of the legacy stations.
+-- slots at train stops and the migration of the legacy stations; since 0.5.0 the 1x1
+-- connectors on the station rims and the move of the 2x1 ones.
 local v2 = {}
 
 local report
@@ -30,11 +31,12 @@ local function halted_train(surface, x, stop_y)
   return wagon
 end
 
+-- A connector built from the item (the bunker look); the script may swap it for the silo
+-- look, so the one standing there afterwards is returned.
 local function connector(surface, position, direction, kind)
-  local c = surface.create_entity({ name = "bulk-connector", position = position, direction = direction, type = kind,
+  surface.create_entity({ name = "bulk-connector-bunker", position = position, direction = direction, type = kind,
     force = "player", raise_built = true })
-  if c then c.update_connections() end
-  return c
+  return surface.find_entities_filtered({ type = "loader-1x1", position = position, radius = 0.1 })[1]
 end
 
 function v2.setup(s, report_fn)
@@ -60,26 +62,38 @@ function v2.setup(s, report_fn)
   s.bunker_wagon.get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 500 })
   local bunker = surface.create_entity({ name = "bulk-unloading-bunker", position = { xb, -9 }, force = "player" })
   s.bunker = remote.call("bulk-wagons", "align_station", bunker)
-  -- connectors on both long sides, outputting onto belts running away from it
-  s.out_east = connector(surface, { xb + 4, -10.5 }, defines.direction.east, "output")
-  s.out_west = connector(surface, { xb - 4, -10.5 }, defines.direction.west, "output")
+  -- connectors on the rims of both long sides, outputting onto belts running away from it
+  s.out_east = connector(surface, { xb + 3.5, -10.5 }, defines.direction.east, "output")
+  s.out_west = connector(surface, { xb - 3.5, -10.5 }, defines.direction.west, "output")
   s.belt_east = {}
   for i = 0, 5 do
-    s.belt_east[#s.belt_east + 1] = surface.create_entity({ name = "transport-belt", position = { xb + 5.5 + i, -10.5 },
+    s.belt_east[#s.belt_east + 1] = surface.create_entity({ name = "transport-belt", position = { xb + 4.5 + i, -10.5 },
       direction = defines.direction.east, force = "player" })
   end
-  -- a connector off the long sides: next to the bunker's end, it must not count as docked
+  -- a connector off the rim: next to the bunker's end, it must not count as docked
   s.end_connector = connector(surface, { xb + 2.5, -15 }, defines.direction.north, "output")
-  -- freshly built, before the loader linked up with the bunker (as when built by hand), both kinds
-  s.fresh_docked = true
-  for k, kind in pairs({ "input", "output" }) do
-    for _, dir in pairs({ defines.direction.east, defines.direction.west }) do
-      local fresh = surface.create_entity({ name = "bulk-connector", position = { xb - 4, -13.5 + k }, direction = dir, type = kind,
-        force = "player" })
-      s.fresh_docked = s.fresh_docked and fresh ~= nil and remote.call("bulk-wagons", "connector_docked", fresh)
-      if fresh then fresh.destroy() end
-    end
+  -- whichever way it is built, the arrow decides: away from the station = output; along
+  -- the track the bunker's way (output)
+  s.arrow_ok = true
+  s.arrow_detail = {}
+  local cases = {
+    { defines.direction.west, "input", "output", defines.direction.west },
+    { defines.direction.west, "output", "output", defines.direction.west },
+    { defines.direction.east, "output", "input", defines.direction.east },
+    { defines.direction.north, "input", "output", defines.direction.west },
+  }
+  for k, case in pairs(cases) do
+    local c = connector(surface, { xb - 3.5, -13.5 + (k - 1) % 2 }, case[1], case[2])
+    local ok = c and c.loader_type == case[3] and c.direction == case[4]
+      and remote.call("bulk-wagons", "connector_docked", c)
+    s.arrow_ok = s.arrow_ok and ok
+    s.arrow_detail[#s.arrow_detail + 1] = c and (c.direction .. c.loader_type .. tostring(c.loader_container and c.loader_container.name)) or "none"
+    if c and k < 3 then c.destroy() end
   end
+  -- the west side now holds out_west and two more: a fourth is refused, the east side has room
+  s.west_full = remote.call("bulk-wagons", "connector_allowed", surface, { x = xb - 3.5, y = -8.5 })
+  s.east_free = remote.call("bulk-wagons", "connector_allowed", surface, { x = xb + 3.5, y = -8.5 })
+  s.grating = remote.call("bulk-wagons", "connector_allowed", surface, { x = xb + 2.5, y = -8.5 })
 
   -- silo over an empty halted wagon, filled by script
   local xs = X0 + 21
@@ -89,8 +103,23 @@ function v2.setup(s, report_fn)
   local silo = surface.create_entity({ name = "bulk-loading-silo", position = { xs, -11 }, force = "player" })
   s.silo = remote.call("bulk-wagons", "align_station", silo)
   remote.call("bulk-wagons", "get_inventory", s.silo).insert({ name = "coal", count = 600 })
-  -- an input connector with a belt feeding it
-  s.in_west = connector(surface, { xs - 4, -10.5 }, defines.direction.east, "input")
+  -- an input connector (arrow towards the silo) takes the silo's look
+  s.in_west = connector(surface, { xs - 2.5, -10.5 }, defines.direction.east, "input")
+
+  -- 0.4 connectors beside a bunker and a silo, moved onto the rims by the update
+  local xc = X0 + 31
+  rails(surface, xc, -41, 41)
+  stop(surface, xc, -21, "Connectors")
+  s.mig_bunker = remote.call("bulk-wagons", "align_station",
+    surface.create_entity({ name = "bulk-unloading-bunker", position = { xc, -11 }, force = "player" }))
+  s.mig_silo = remote.call("bulk-wagons", "align_station",
+    surface.create_entity({ name = "bulk-loading-silo", position = { xc, -4 }, force = "player" }))
+  -- where 0.4 docked them: 2 tiles long, right beside the old 6-tile-wide station
+  s.old_out = surface.create_entity({ name = "bulk-connector", position = { xc + 4, -12.5 }, direction = defines.direction.east,
+    type = "output", force = "player" })
+  s.old_out.set_filter(1, { name = "iron-ore" })
+  s.old_in = surface.create_entity({ name = "bulk-fast-connector", position = { xc - 4, -3.5 }, direction = defines.direction.east,
+    type = "input", force = "player" })
 
   -- migration: three pits under a wagon slot, a lone loader at a wagon end
   local xm = X0 + 41
@@ -124,7 +153,8 @@ function v2.after_setup(s)
   remote.call("bulk-wagons", "recover_spilled", { { s.silo.position.x - 5, -30 }, { s.silo.position.x + 5, 10 } })
   s.recovered = remote.call("bulk-wagons", "get_inventory", s.silo).get_item_count("coal") - s.recovered_before
   -- migrate on demand (a fresh game counts as migrated)
-  remote.call("bulk-wagons", "migrate_legacy", { { X0 + 30, -60 }, { X0 + 60, 60 } })
+  remote.call("bulk-wagons", "migrate_legacy", { { X0 + 35, -60 }, { X0 + 60, 60 } })
+  remote.call("bulk-wagons", "migrate_connectors")
 end
 
 function v2.check(s)
@@ -149,13 +179,19 @@ function v2.check(s)
     "connector without a belt holds the ore, nothing on the ground", held .. " held")
   report(s.out_east.loader_container ~= nil and s.out_east.loader_container == remote.call("bulk-wagons", "get_store", s.bunker),
     "connector docks onto the bunker inventory")
-  report(s.fresh_docked, "a connector counts as docked right when it is built, input or output, either way round")
+  report(s.arrow_ok, "the arrow sets input or output, along the track the station's way", table.concat(s.arrow_detail, " "))
   report(remote.call("bulk-wagons", "connector_docked", s.out_east) and not remote.call("bulk-wagons", "connector_docked", s.end_connector),
-    "only the long sides count as docking points")
+    "only the rim counts as docking point")
+  report(s.west_full == "bulk-wagons.side-full" and s.east_free == true and s.grating == "bulk-wagons.needs-station",
+    "at most three connectors per side, only on the rim", tostring(s.west_full) .. " " .. tostring(s.east_free) .. " " .. tostring(s.grating))
   -- collision: rim blocks the player, gratings and track do not
   local function walkable(x, y) return surface.can_place_entity({ name = "character", position = { x, y } }) end
-  report(not walkable(xb + 2.5, -11) and not walkable(xb - 2.5, -9) and walkable(xb + 1.5, -11) and walkable(xb - 1.5, -12),
+  report(not walkable(xb + 3.5, -11) and not walkable(xb - 3.5, -9) and walkable(xb + 2.5, -11) and walkable(xb - 1.5, -12),
     "bunker rim blocks players, its gratings do not")
+  report(surface.can_place_entity({ name = "bulk-connector-bunker", position = { xb + 3.5, -8.5 }, force = "player" }),
+    "a connector fits onto the bunker rim")
+  local tall = prototypes.entity["bulk-loading-silo"]
+  report(tall ~= nil, "silo prototype exists")
   report(not surface.can_place_entity({ name = "stone-furnace", position = { xb + 1.5, -11 } }), "bunker blocks buildings")
 
   local xs = X0 + 21
@@ -163,6 +199,27 @@ function v2.check(s)
   local coal = s.silo_wagon.get_inventory(defines.inventory.cargo_wagon).get_item_count("coal")
   report(coal > 0, "silo fills the wagon", coal .. " coal")
   report(not walkable(xs + 1.5, -11) and not walkable(xs - 2.5, -9), "silo blocks players beside the track")
+  local in_west = surface.find_entities_filtered({ type = "loader-1x1", position = { xs - 2.5, -10.5 }, radius = 0.1 })[1]
+  report(in_west and in_west.name == "bulk-connector-silo" and in_west.loader_type == "input"
+    and in_west.loader_container == remote.call("bulk-wagons", "get_store", s.silo),
+    "a connector on the silo takes the chute look and feeds the silo", in_west and in_west.name or "none")
+
+  local xc = X0 + 31
+  local function loader_at(x, y) return surface.find_entities_filtered({ type = "loader-1x1", position = { x, y }, radius = 0.1 })[1] end
+  local function belt_at(x, y) return surface.find_entities_filtered({ type = "transport-belt", position = { x, y }, radius = 0.1 })[1] end
+  local out = loader_at(xc + 3.5, -12.5)
+  report(not s.old_out.valid and out and out.name == "bulk-connector-bunker" and out.loader_type == "output"
+    and out.direction == defines.direction.east and out.get_filter(1) and out.get_filter(1).name == "iron-ore"
+    and belt_at(xc + 4.5, -12.5) ~= nil and remote.call("bulk-wagons", "connector_docked", out),
+    "a 0.4 connector beside a bunker moves onto its rim, keeps its filter, a belt fills the gap",
+    out and (out.name .. " " .. out.loader_type .. " " .. out.direction) or "none")
+  local inp = loader_at(xc - 2.5, -3.5)
+  local b1, b2 = belt_at(xc - 3.5, -3.5), belt_at(xc - 4.5, -3.5)
+  report(not s.old_in.valid and inp and inp.name == "bulk-fast-connector-silo" and inp.loader_type == "input"
+    and b1 and b2 and b1.name == "fast-transport-belt" and b1.direction == defines.direction.east
+    and remote.call("bulk-wagons", "connector_docked", inp),
+    "a 0.4 connector beside a silo moves onto its rim, two belts of its tier fill the gap",
+    inp and (inp.name .. " " .. inp.loader_type) or "none")
 
   local xm = X0 + 41
   local bunkers = surface.find_entities_filtered({ name = "bulk-unloading-bunker", area = { { xm - 4, -15 }, { xm + 4, -7 } } })

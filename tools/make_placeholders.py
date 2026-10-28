@@ -79,6 +79,28 @@ def wagon_station(frame, inner, accent):
     return c
 
 
+def connector(frame, hood, container_up):
+    # 1 x 1 tile seen with the goods flowing north: side rails along the belt and a hood
+    # over the half towards the station (north for an input, south for an output)
+    c = Canvas(TILE, TILE)
+    c.rect(0, 0, 8, TILE, frame)
+    c.rect(TILE - 8, 0, TILE, TILE, frame)
+    y0 = 0 if container_up else TILE // 2
+    c.rect(0, y0, TILE, y0 + TILE // 2, hood)
+    return c
+
+
+def connector_sheet(frame, hood, container_up):
+    # the loader sheet: one frame per direction, north, east, south, west
+    single = connector(frame, hood, container_up)
+    sheet = Canvas(4 * TILE, TILE)
+    for d in range(4):
+        r = single.rotated(d)
+        for y in range(TILE):
+            sheet.px[(y * sheet.w + d * TILE) * 4:(y * sheet.w + d * TILE + TILE) * 4] = r.px[y * TILE * 4:(y + 1) * TILE * 4]
+    return sheet
+
+
 def icon(frame, inner, accent):
     c = Canvas(64, 64)
     c.rect(4, 20, 60, 44, frame)
@@ -103,6 +125,10 @@ def main():
     for v in range(2):
         bunker.rotated(v).save(f"unloading-bunker-{v + 1}.png")
         silo.rotated(v).save(f"loading-silo-{v + 1}.png")
+    for name, frame, hood in (("bunker", (139, 135, 126, 255), (60, 58, 54, 255)),
+                              ("silo", (122, 90, 44, 255), (154, 138, 106, 255))):
+        connector_sheet(frame, hood, True).save(f"connector-{name}-in.png")
+        connector_sheet(frame, hood, False).save(f"connector-{name}-out.png")
     icon((139, 135, 126, 255), (29, 27, 24, 255), belt).save("unloading-pit-icon.png")
     icon((122, 90, 44, 255), (154, 138, 106, 255), belt).save("loading-station-icon.png")
     icon((180, 74, 42, 255), (110, 90, 58, 255), belt).save("belt-loader-icon.png")
