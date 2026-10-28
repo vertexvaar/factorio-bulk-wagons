@@ -157,6 +157,7 @@ shared.control_offset = { -2.5, 0.5 } -- variant 1, rotated like the port
 -- too (data-final-fixes.lua), rails and trains do not, so a station fits across the
 -- track but not onto anything else.
 shared.collision_layer = "bulk_wagons_station"
+shared.loader_layer = "bulk_wagons_loader"
 
 -- Hidden constant combinator that puts a station's wagon readings on its network.
 shared.signals = "bulk-station-signals"

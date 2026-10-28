@@ -9,7 +9,11 @@ local gfx = "__bulk-wagons__/graphics/placeholder/"
 -- built across them) or with trains, but must block buildings and belts (via their
 -- own layer, see shared.collision_layer). Players are blocked too, except on the
 -- pit whose grate is walkable.
-data:extend({ { type = "collision-layer", name = shared.collision_layer } })
+data:extend({
+  { type = "collision-layer", name = shared.collision_layer },
+  -- the game wants every two loaders to collide: the hidden ports and the connectors share this
+  { type = "collision-layer", name = shared.loader_layer },
+})
 local station_mask = { layers = { [shared.collision_layer] = true, player = true, transport_belt = true, is_object = true } }
 local walkable_mask = { layers = { [shared.collision_layer] = true, transport_belt = true, is_object = true } }
 
@@ -325,7 +329,7 @@ local function make_port(name, speed, container_distance, rail_interaction)
   }
   port.selectable_in_game = false
   port.minable = nil
-  port.collision_mask = { layers = { transport_belt = true } }
+  port.collision_mask = { layers = { transport_belt = true, [shared.loader_layer] = true } }
   port.speed = speed.speed
   port.belt_animation_set = speed.belt_animation_set
   port.container_distance = container_distance
@@ -419,7 +423,7 @@ data:extend(blockers)
 -- (the script takes back one built anywhere else). They never drop goods on the ground:
 -- an output without a belt simply holds them. They do not collide with the station or
 -- its blockers, only with other buildings and belts.
-local connector_mask = { layers = { item = true, object = true } }
+local connector_mask = { layers = { item = true, object = true, [shared.loader_layer] = true } }
 local base_loader = data.raw["loader-1x1"]["loader-1x1"]
 local previous = {}
 local order = 0
