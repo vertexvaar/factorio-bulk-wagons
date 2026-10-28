@@ -9,6 +9,15 @@ data:extend({
     order = "a",
   },
   {
+    type = "int-setting",
+    name = "bulk-wagons-wagon-weight",
+    setting_type = "startup",
+    default_value = 1000,
+    minimum_value = 100,
+    maximum_value = 20000,
+    order = "ab",
+  },
+  {
     type = "double-setting",
     name = "bulk-wagons-pit-multiplier",
     setting_type = "startup",

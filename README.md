@@ -17,6 +17,7 @@ Factorio 2.1 mod (Space Age optional) that adds a bulk wagon for ores and other 
 | Setting | Type | Default |
 | --- | --- | --- |
 | Bulk wagon inventory slots | startup | 40 |
+| Bulk wagon weight | startup | 1000 |
 | Unloading bunker size (× wagon) | startup | 3 |
 | Loading silo size (× wagon) | startup | 3 |
 | Built-in belt speed (old stations only) | startup | express |
