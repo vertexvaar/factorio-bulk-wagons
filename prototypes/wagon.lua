@@ -2,6 +2,7 @@ local shared = require("shared")
 local graphics = require("prototypes.graphics")
 
 local slots = settings.startup["bulk-wagons-wagon-slots"].value
+local weight = settings.startup["bulk-wagons-wagon-weight"].value
 
 -- Placeholder: reuses the vanilla cargo wagon artwork (incl. its colour mask)
 -- until the final sprites exist.
@@ -10,6 +11,8 @@ wagon.name = shared.wagon
 wagon.icons = { { icon = "__bulk-wagons__/graphics/icons/bulk-wagon.png", icon_size = 64 } }
 wagon.icon = nil
 wagon.inventory_size = slots
+-- 1000 like the vanilla cargo wagon; heavier for mods that simulate train mass
+wagon.weight = weight
 wagon.minable = { mining_time = 0.5, result = shared.wagon }
 -- alpha 0.5 like all vanilla rolling stock, the masks are made for it
 wagon.color = { r = 0.56, g = 0.23, b = 0.15, a = 0.5 }

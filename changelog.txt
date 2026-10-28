@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.4
+Date: 2026-10-28
+  Features:
+    - New startup setting "Bulk wagon weight" (default 1000 like the vanilla cargo wagon), for mods that simulate train mass. It applies to the planet variants too.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.3
 Date: 2026-10-26
   Bugfixes:
