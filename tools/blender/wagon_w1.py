@@ -299,6 +299,10 @@ def build(planet="nauvis"):
 
 SLOPE_STEP = math.radians(1.25)
 SLOPE_STEPS = 20
+# Measured against the vanilla sloped cargo wagon: east-west it matches a plain tilt,
+# north-south its ends rise about 1.6 times as far on screen. There the wagon is
+# sheared (raised without getting shorter along the track) by that much more.
+NS_GAIN = 1.6
 
 
 def slope_of(i):
@@ -310,13 +314,21 @@ def slope_of(i):
 
 def render_sloped(out, frames):
     build()
-    # a taller frame for the raised end, and the ground under the lowered one
-    rig.camera(9, 11, shift_y=1.3)
-    rig.shadow_catcher().location.z = -math.sin(SLOPE_STEPS * SLOPE_STEP) * END_Y
+    # a larger frame for the raised end and the long east-west shadow, and the
+    # ground under the lowered end
+    rig.camera(12, 12, shift_y=1.3)
+    rig.shadow_catcher().location.z = -NS_GAIN * math.tan(SLOPE_STEPS * SLOPE_STEP) * END_Y
 
     def pose(i):
         orientation, tilt = slope_of(i)
-        rig.root().rotation_euler = (tilt, 0, -orientation * 2 * math.pi)
+        root = rig.root()
+        if orientation == 0:
+            # tilt, then stretch along the track so the wagon keeps its length on the ground
+            tilt = math.atan(NS_GAIN * math.tan(tilt))
+            root.scale = (1, 1 / math.cos(tilt), 1)
+        else:
+            root.scale = (1, 1, 1)
+        root.rotation_euler = (tilt, 0, -orientation * 2 * math.pi)
 
     rig.render_frames(out, frames, lambda i: slope_of(i)[0], passes=("color", "mask", "shadow"), samples=32, pose=pose)
 

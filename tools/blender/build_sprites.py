@@ -141,13 +141,15 @@ def main(render_dir):
                 images = heap_fit(images, HEAP_DROP, HEAP_STRETCH)
             meta["wagon"][kind] = write_sheet(images, o, f"bulk-wagon-{kind}", 8, 4)
     # the wagon on rail ramps: 40 north-south frames, then 40 east-west (see wagon_w1.py)
+    # (own set, so it can be rendered without the flat frames)
     src = os.path.join(render_dir, "w1-sloped")
-    if os.path.isdir(src) and "wagon" in meta:
+    if os.path.isdir(src):
         o = origin_of(src, 1.0)
+        meta["wagon-sloped"] = {}
         for kind in ("color", "mask", "shadow"):
             images = frames(src, kind, 80, 1.0)
             images = [lifted([im], WAGON_LIFT)[0] for im in images[:40]] + images[40:]
-            meta["wagon"][f"sloped_{kind}"] = write_sheet(images, o, f"bulk-wagon-sloped-{kind}", 4, 5)
+            meta["wagon-sloped"][kind] = write_sheet(images, o, f"bulk-wagon-sloped-{kind}", 4, 5)
 
     for key, layers in (
         ("b3", {"base": 1, "base_mask": 1, "shadow": 1, "top_static": 1, "idle": 1, "idle_mask": 1, "extend": 8, "extend_mask": 8,

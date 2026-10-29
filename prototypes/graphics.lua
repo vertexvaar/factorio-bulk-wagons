@@ -214,16 +214,17 @@ function graphics.wagon_pictures(planet)
     },
   }
   -- the wagon tilted on rail ramps, laid out like the vanilla cargo wagon's sloped sheets
-  if set.sloped_color then
-    local sloped = { direction_count = set.sloped_color.frame_count, back_equals_front = true, usage = "train" }
+  local tilt = sprites["wagon-sloped"]
+  if tilt then
+    local sloped = { direction_count = tilt.color.frame_count, back_equals_front = true, usage = "train" }
     local function tilted(extra) return with(extra, sloped) end
     pictures.slope_angle_between_frames = 1.25
     pictures.slope_back_equals_front = true
     pictures.sloped = {
       layers = {
-        sheet(set.sloped_color, tilted({ tint = tint_for(planet) })),
-        sheet(set.sloped_mask, tilted({ flags = { "mask" }, apply_runtime_tint = true })),
-        sheet(set.sloped_shadow, tilted({ draw_as_shadow = true })),
+        sheet(tilt.color, tilted({ tint = tint_for(planet) })),
+        sheet(tilt.mask, tilted({ flags = { "mask" }, apply_runtime_tint = true })),
+        sheet(tilt.shadow, tilted({ draw_as_shadow = true })),
       },
     }
   end
