@@ -1,6 +1,6 @@
 ---------------------------------------------------------------------------------------------------
 Version: 0.5.0
-Date: 2026-10-28
+Date: 2026-10-29
   Major Features:
     - Bulk connectors take the belt on one rim tile of a long side of the unloading bunker or loading silo and climb sideways over the next rim tile (clockwise): a bucket elevator out of the bunker pit, a conveyor up to the silo bin. At most three per side. They work only there; anywhere else they are handed back, and ghosts elsewhere or on a full side disappear.
     - While a connector is in the cursor (item, ghost or blueprint), the free rim tiles of the stations nearby show the game's green placement indicators.
