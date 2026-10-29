@@ -211,10 +211,11 @@ function shared.connectors_on_side(surface, position, base, variant, side, names
   return count
 end
 
--- The silo's connector climbs sideways over the next rim tile (clockwise from its outward
--- direction, seen from above), so it takes two tiles; a hidden slot entity holds the second.
+-- A connector climbs sideways over the next rim tile (clockwise from its outward direction,
+-- seen from above): the silo's conveyor up to the bin, the bunker's elevator out of the pit.
+-- So it takes two tiles; a hidden slot entity holds the second.
 shared.connector_slot = "bulk-connector-slot"
-function shared.needs_slot(base) return base == shared.silo end
+function shared.needs_slot(base) return base == shared.silo or base == shared.bunker end
 
 function shared.slot_offset(variant, side)
   local ox, oy

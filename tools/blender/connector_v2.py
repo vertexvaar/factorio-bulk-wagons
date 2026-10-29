@@ -2,8 +2,9 @@
 drawn over the loader's belt. The painted parts take the belt tier's colour
 (build_sprites.py tints them).
 
-- bunker: a bucket elevator. Its boot sits in the pit opening of the bunker rim, the
-  casing rises to a head drum, and a spout drops the goods onto the belt.
+- bunker: an inclined bucket elevator over two rim tiles. Its boot sits in the rim pit of
+  the next tile (clockwise, east in the model), the casing climbs sideways to the head drum
+  over the connector's tile, and a spout drops the goods onto the belt.
 - silo: a belt conveyor in a casing over two rim tiles. Its tail hood takes the goods off
   the belt, the casing climbs sideways over the next tile (clockwise, east in the model)
   to the collector trough of the silo and discharges through the inlet there.
@@ -30,53 +31,69 @@ def _objects():
 
 
 def elevator(p):
-    """Bucket elevator: boot in the rim pit, twin-leg casing, head drum, spout to the belt."""
-    by = -0.27  # casing axis, over the station half of the tile
-    head_z = 1.62
-    # boot: a hopper sunk into the rim, the buckets dig the goods out of the feeder below
-    rig.box("boot", (0, by, 0.16), (0.62, 0.38, 0.3), p["olive"], bevel=0.02, mask=True)
-    rig.box("boot_cover", (0, by, 0.32), (0.66, 0.42, 0.04), p["steel"], bevel=0.008)
-    kit.rivets((-0.28, by - 0.2, 0.25), (0.28, by - 0.2, 0.25), 6, (0, -1, 0))
-    kit.rivets((-0.28, by + 0.2, 0.25), (0.28, by + 0.2, 0.25), 6, (0, 1, 0))
-    kit.hazard((0, by + 0.195, 0.1), (0.56, 0.02, 0.1), stripes=5)
-    rig.box("boot_take_up", (0.34, by, 0.24), (0.06, 0.2, 0.14), p["dark"], bevel=0.005)
-    rig.cylinder("boot_screw", (0.37, by, 0.24), (0.37, by, 0.42), 0.012, p["chrome"], verts=8)
-    # twin legs (up and down run of the buckets), flanged every few sections
-    for dx in (-0.1, 0.1):
-        rig.box(f"leg{dx}", (dx, by, (0.34 + head_z) / 2), (0.15, 0.22, head_z - 0.34), p["olive"], bevel=0.008, mask=True)
-    for k in range(5):
-        z = 0.5 + k * 0.25
-        rig.box(f"flange{k}", (0, by, z), (0.38, 0.27, 0.03), p["steel"], bevel=0.004)
-        kit.rivets((-0.17, by - 0.14, z), (0.17, by - 0.14, z), 4, (0, -1, 0), radius=0.01)
-    # inspection door with handle on the camera side of the up leg
-    rig.box("door", (0.1, by + 0.115, 0.95), (0.12, 0.012, 0.2), p["steel"], bevel=0.004)
-    rig.box("door_handle", (0.13, by + 0.125, 0.95), (0.02, 0.01, 0.06), p["chrome"], bevel=0)
-    # head: housing over the drum, drum bearings, motor and gearbox on the side
-    rig.box("head", (0, by + 0.04, head_z + 0.1), (0.44, 0.4, 0.34), p["olive"], bevel=0.02, mask=True)
-    rig.box("head_hood", (0, by + 0.04, head_z + 0.29), (0.46, 0.42, 0.05), p["steel"], bevel=0.01)
-    rig.cylinder("drum_axle", (-0.29, by + 0.02, head_z + 0.08), (0.29, by + 0.02, head_z + 0.08), 0.03, p["chrome"], verts=12)
+    """Inclined bucket elevator over two tiles: the boot sits in the rim pit of the next tile
+    (clockwise, east in the model) and digs the goods out of the feeder below, the twin-leg
+    casing climbs sideways to the head over the connector's own tile, and a spout drops the
+    goods into the hood on the belt."""
+    from mathutils import Vector
+    by = -0.22  # casing axis, over the station half of the tiles
+    boot = Vector((1.0, by, 0.16))
+    head = Vector((-0.02, by, 1.62))
+    # boot: a hopper sunk into the rim pit, with take-up screw and hazard band
+    rig.box("boot", boot, (0.66, 0.46, 0.34), p["olive"], bevel=0.02, mask=True)
+    rig.box("boot_cover", boot + Vector((0, 0, 0.18)), (0.7, 0.5, 0.04), p["steel"], bevel=0.008)
+    kit.rivets(boot + Vector((-0.3, -0.24, 0.1)), boot + Vector((0.3, -0.24, 0.1)), 6, (0, -1, 0))
+    kit.rivets(boot + Vector((-0.3, 0.24, 0.1)), boot + Vector((0.3, 0.24, 0.1)), 6, (0, 1, 0))
+    kit.hazard(boot + Vector((0, 0.235, -0.06)), (0.6, 0.02, 0.1), stripes=5)
+    rig.box("boot_take_up", boot + Vector((0.36, 0, 0.08)), (0.06, 0.24, 0.16), p["dark"], bevel=0.005)
+    rig.cylinder("boot_screw", boot + Vector((0.39, 0, 0.08)), boot + Vector((0.39, 0, 0.3)), 0.014, p["chrome"], verts=8)
+    # twin legs climbing from the boot to the head, flanged along the way
+    start = boot + Vector((-0.12, 0, 0.18))
+    end = head + Vector((0.14, 0, -0.12))
+    for dy in (-0.11, 0.11):
+        axis, length, rotation = beam(f"leg{dy}", start + Vector((0, dy, 0)), end + Vector((0, dy, 0)), (0.2, 0.18),
+                                      p["olive"], bevel=0.008, mask=True)
+    for k in range(7):
+        c = start + axis * (0.12 + k * (length - 0.24) / 6)
+        rig.box(f"flange{k}", c, (0.3, 0.48, 0.035), p["steel"], bevel=0.004, rotation=rotation)
+    side = Vector((0, 0.205, 0))
+    for k in range(2):  # inspection doors on the camera side
+        c = start + axis * (0.45 + k * (length - 0.9)) + side
+        rig.box(f"door{k}", c, (0.14, 0.012, 0.22), p["steel"], bevel=0.003, rotation=rotation)
+        rig.box(f"door_handle{k}", c + Vector((0.04, 0.01, 0)), (0.02, 0.01, 0.06), p["chrome"], bevel=0, rotation=rotation)
+    kit.rivets(start + axis * 0.2 + side + Vector((0.11, 0, 0)), end - axis * 0.2 + side + Vector((0.11, 0, 0)), 9, (0, 1, 0),
+               radius=0.01)
+    # trestle under the middle of the climb
+    mid = start + axis * (length * 0.5)
+    for dy in (-0.2, 0.2):
+        rig.cylinder(f"post{dy}", (mid.x, mid.y + dy, 0.04), (mid.x, mid.y + dy, mid.z - 0.16), 0.03, p["steel"], verts=8)
+        kit.footing(mid.x, mid.y + dy, size=(0.16, 0.16), height=0.05)
+    rig.box("trestle_cap", (mid.x, mid.y, mid.z - 0.16), (0.14, 0.52, 0.06), p["steel"], bevel=0.004)
+    rig.cylinder("trestle_brace", (mid.x, mid.y - 0.2, 0.15), (mid.x, mid.y + 0.2, mid.z - 0.24), 0.014, p["steel"], verts=6)
+    # head: housing over the drum, bearings, gearbox and motor, warning lamp
+    rig.box("head", head + Vector((0, 0.04, 0.1)), (0.5, 0.46, 0.38), p["olive"], bevel=0.02, mask=True)
+    rig.box("head_hood", head + Vector((0, 0.04, 0.31)), (0.52, 0.48, 0.05), p["steel"], bevel=0.01)
+    rig.cylinder("drum_axle", head + Vector((-0.32, 0.02, 0.08)), head + Vector((0.32, 0.02, 0.08)), 0.032, p["chrome"], verts=12)
     for sx in (-1, 1):
-        rig.box(f"bearing{sx}", (sx * 0.25, by + 0.02, head_z + 0.08), (0.05, 0.12, 0.1), p["dark"], bevel=0.006)
-    kit.rivets((-0.2, by - 0.165, head_z + 0.22), (0.2, by - 0.165, head_z + 0.22), 5, (0, -1, 0), radius=0.012)
-    kit.gearbox((0.36, by + 0.02, head_z + 0.06), size=(0.14, 0.18, 0.18))
-    kit.motor((0.36, by + 0.02, head_z + 0.25), axis="y", length=0.2, radius=0.065)
-    kit.lamp((-0.16, by + 0.18, head_z + 0.34), "amber", size=0.03)
+        rig.box(f"bearing{sx}", head + Vector((sx * 0.28, 0.02, 0.08)), (0.05, 0.13, 0.11), p["dark"], bevel=0.006)
+    kit.rivets(head + Vector((-0.22, -0.195, 0.22)), head + Vector((0.22, -0.195, 0.22)), 5, (0, -1, 0), radius=0.012)
+    kit.gearbox(tuple(head + Vector((-0.4, 0.02, 0.06))), size=(0.14, 0.2, 0.18))
+    kit.motor(tuple(head + Vector((-0.4, 0.02, 0.27))), axis="y", length=0.22, radius=0.07)
+    kit.lamp(tuple(head + Vector((0.18, 0.22, 0.36))), "amber", size=0.032)
     # spout from the head down onto the belt, ending in a hood with rubber curtains
-    a, b = (0, by + 0.2, head_z), (0, 0.18, 0.5)
+    a, b = (0, by + 0.24, head.z), (0, 0.18, 0.5)
     dy, dz = b[1] - a[1], b[2] - a[2]
     length = math.hypot(dy, dz)
     tilt = math.atan2(-dy, dz)
-    rig.box("spout", ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), (0.24, 0.16, length), p["steel"], bevel=0.01,
+    rig.box("spout", ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), (0.28, 0.18, length), p["steel"], bevel=0.01,
             rotation=(tilt, 0, 0))
-    rig.box("hood", (0, 0.22, 0.27), (0.6, 0.36, 0.3), p["olive"], bevel=0.02, mask=True)
-    rig.box("hood_roof", (0, 0.22, 0.43), (0.62, 0.38, 0.03), p["steel"], bevel=0.006)
-    rig.box("hood_mouth", (0, 0.405, 0.2), (0.48, 0.01, 0.2), p["dark"], bevel=0)
+    rig.box("hood", (0, 0.22, 0.27), (0.64, 0.38, 0.32), p["olive"], bevel=0.02, mask=True)
+    rig.box("hood_roof", (0, 0.22, 0.445), (0.66, 0.4, 0.03), p["steel"], bevel=0.006)
+    rig.box("hood_mouth", (0, 0.415, 0.2), (0.5, 0.01, 0.22), p["dark"], bevel=0)
     for c in range(6):
-        rig.box(f"curtain{c}", (-0.2 + c * 0.08, 0.412, 0.19), (0.07, 0.008, 0.2), p["rubber"], bevel=0)
-    kit.rivets((-0.27, 0.41, 0.38), (0.27, 0.41, 0.38), 6, (0, 1, 0), radius=0.01)
-    # stay from the head to the hood, and a cable to the motor
-    rig.cylinder("stay", (-0.24, by + 0.2, head_z - 0.05), (-0.26, 0.2, 0.42), 0.014, p["steel"], verts=6)
-    kit.cable([(0.36, by - 0.05, head_z + 0.3), (0.32, by - 0.12, 1.0), (0.3, by - 0.14, 0.34)], "red")
+        rig.box(f"curtain{c}", (-0.21 + c * 0.084, 0.422, 0.19), (0.074, 0.008, 0.22), p["rubber"], bevel=0)
+    kit.rivets((-0.29, 0.42, 0.39), (0.29, 0.42, 0.39), 6, (0, 1, 0), radius=0.01)
+    kit.cable([(-0.4, by - 0.05, head.z + 0.3), (0.2, by - 0.16, 1.0), (boot.x - 0.2, by - 0.24, 0.36)], "red")
 
 
 def beam(name, a, b, section, mat, bevel=0.01, mask=False):
@@ -169,10 +186,7 @@ def build(kind):
     BUILDERS[kind](p)
     rig.sun()
     rig.fill_light()
-    if kind == "bunker":
-        rig.camera(3, 3.5, shift_y=0.6)
-    else:
-        rig.camera(4, 5, shift_y=1.4)
+    rig.camera(4, 5, shift_y=1.4)
 
 
 if __name__ == "__main__":

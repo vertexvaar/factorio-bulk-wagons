@@ -24,14 +24,10 @@ if __name__ == "__main__":
         edge = 2.5
     station.build()
     for y in (-2.5, -0.5, 1.5):
-        if kind == "bunker":
-            connector_v2.place(kind, (edge, y, 0), 1)
-            connector_v2.place(kind, (-edge, y + 1, 0), 3)
-        else:
-            # the silo's conveyors climb over the next tile clockwise: south on the east
-            # side, north on the west side (Blender y points north)
-            connector_v2.place(kind, (edge, y + 1, 0), 1)
-            connector_v2.place(kind, (-edge, y, 0), 3)
+        # the connectors climb over the next tile clockwise: south on the east side, north
+        # on the west side (Blender y points north)
+        connector_v2.place(kind, (edge, y + 1, 0), 1)
+        connector_v2.place(kind, (-edge, y, 0), 3)
     orientation = 0.25 if view == "turned" else 0
     if view == "closeup":
         rig.root().location.x = -edge - 0.3

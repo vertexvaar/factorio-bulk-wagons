@@ -83,16 +83,19 @@ function v2.setup(s, report_fn)
     { defines.direction.north, "input", "output", defines.direction.west },
   }
   for k, case in pairs(cases) do
-    local c = connector(surface, { xb - 3.5, -13.5 + (k - 1) % 2 }, case[1], case[2])
+    -- connectors on the west side take the rim tile north of them as well
+    local c = connector(surface, { xb - 3.5, k < 4 and -12.5 or -8.5 }, case[1], case[2])
     local ok = c and c.loader_type == case[3] and c.direction == case[4]
       and remote.call("bulk-wagons", "connector_docked", c)
     s.arrow_ok = s.arrow_ok and ok
     s.arrow_detail[#s.arrow_detail + 1] = c and (c.direction .. c.loader_type .. tostring(c.loader_container and c.loader_container.name)) or "none"
-    if c and k < 3 then c.destroy() end
+    if c and k < 3 then c.destroy({ raise_destroy = true }) end
   end
   -- the west side now holds out_west and two more: a fourth is refused, the east side has room
   s.west_full = remote.call("bulk-wagons", "connector_allowed", surface, { x = xb - 3.5, y = -8.5 })
-  s.east_free = remote.call("bulk-wagons", "connector_allowed", surface, { x = xb + 3.5, y = -8.5 })
+  s.east_free = remote.call("bulk-wagons", "connector_allowed", surface, { x = xb + 3.5, y = -12.5 })
+  -- the bunker's elevator needs the next rim tile clockwise: the last one on the east side has none
+  s.east_end = remote.call("bulk-wagons", "connector_allowed", surface, { x = xb + 3.5, y = -8.5 })
   s.grating = remote.call("bulk-wagons", "connector_allowed", surface, { x = xb + 2.5, y = -8.5 })
 
   -- silo over an empty halted wagon, filled by script
@@ -184,6 +187,9 @@ function v2.check(s)
     "only the rim counts as docking point")
   report(s.west_full == "bulk-wagons.side-full" and s.east_free == true and s.grating == "bulk-wagons.needs-station",
     "at most three connectors per side, only on the rim", tostring(s.west_full) .. " " .. tostring(s.east_free) .. " " .. tostring(s.grating))
+  report(s.east_end == "bulk-wagons.needs-room" and #surface.find_entities_filtered({ name = "bulk-connector-slot",
+      position = { xb + 3.5, -9.5 }, radius = 0.1 }) == 1,
+    "a bunker connector takes the next rim tile clockwise as well", tostring(s.east_end))
   -- collision: rim blocks the player, gratings and track do not
   local function walkable(x, y) return surface.can_place_entity({ name = "character", position = { x, y } }) end
   report(not walkable(xb + 3.5, -11) and not walkable(xb - 3.5, -9) and walkable(xb + 2.5, -11) and walkable(xb - 1.5, -12),

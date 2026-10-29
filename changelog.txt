@@ -2,7 +2,7 @@
 Version: 0.5.0
 Date: 2026-10-28
   Major Features:
-    - Bulk connectors are 1 x 1 and stand on the rim of a long side of the unloading bunker or loading silo, at most three per side. They work only there; anywhere else they are handed back, and ghosts elsewhere or on a full side disappear.
+    - Bulk connectors take the belt on one rim tile of a long side of the unloading bunker or loading silo and climb sideways over the next rim tile (clockwise): a bucket elevator out of the bunker pit, a conveyor up to the silo bin. At most three per side. They work only there; anywhere else they are handed back, and ghosts elsewhere or on a full side disappear.
     - While a connector is in the cursor (item, ghost or blueprint), the free rim tiles of the stations nearby show the game's green placement indicators.
     - The arrow decides the way of the goods: pointing away from the station the connector takes goods out, pointing at it the connector feeds them in. Built along the track it does what its station does.
   Changes:
