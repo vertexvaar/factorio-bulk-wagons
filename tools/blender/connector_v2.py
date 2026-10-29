@@ -81,7 +81,7 @@ def elevator(p):
     kit.motor(tuple(head + Vector((-0.4, 0.02, 0.27))), axis="y", length=0.22, radius=0.07)
     kit.lamp(tuple(head + Vector((0.18, 0.22, 0.36))), "amber", size=0.032)
     # spout from the head down onto the belt, ending in a hood with rubber curtains
-    a, b = (0, by + 0.24, head.z), (0, 0.18, 0.5)
+    a, b = (0, by + 0.24, head.z), (0, 0.12, 0.34)
     dy, dz = b[1] - a[1], b[2] - a[2]
     length = math.hypot(dy, dz)
     tilt = math.atan2(-dy, dz)
