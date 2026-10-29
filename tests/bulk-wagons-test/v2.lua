@@ -203,6 +203,13 @@ function v2.check(s)
   report(in_west and in_west.name == "bulk-connector-silo" and in_west.loader_type == "input"
     and in_west.loader_container == remote.call("bulk-wagons", "get_store", s.silo),
     "a connector on the silo takes the chute look and feeds the silo", in_west and in_west.name or "none")
+  local slot = surface.find_entities_filtered({ name = "bulk-connector-slot", position = { xs - 2.5, -11.5 }, radius = 0.1 })[1]
+  local function allowed(x, y) return tostring(remote.call("bulk-wagons", "connector_allowed", surface, { x = x, y = y })) end
+  local checks = { allowed(xs - 2.5, -11.5), allowed(xs - 2.5, -13.5), allowed(xs - 2.5, -8.5), allowed(xs + 2.5, -8.5),
+    allowed(xs + 2.5, -9.5) }
+  report(slot ~= nil and checks[1] == "bulk-wagons.needs-room" and checks[2] == "bulk-wagons.needs-room"
+    and checks[3] == "true" and checks[4] == "bulk-wagons.needs-room" and checks[5] == "true",
+    "a silo connector takes the next rim tile clockwise as well", table.concat(checks, " "))
 
   local xc = X0 + 31
   local function loader_at(x, y) return surface.find_entities_filtered({ type = "loader-1x1", position = { x, y }, radius = 0.1 })[1] end

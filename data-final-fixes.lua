@@ -4,12 +4,14 @@ local collision_mask_util = require("__core__/lualib/collision-mask-util")
 -- Everything a station must not be built onto gets the station collision layer:
 -- buildings, trees, rocks, cliffs (all with the object layer) except rails, plus the
 -- rail signals, supports and ramps that live next to and over the track.
--- The connectors stand on the station's rim and are left out.
+-- The connectors (and the slots their conveyors take) stand on the station's rim and are
+-- left out.
 local NEAR_TRACK = { ["rail-signal"] = true, ["rail-chain-signal"] = true, ["rail-support"] = true, ["rail-ramp"] = true }
 local ON_STATION = {}
 for _, name in pairs(shared.connector_names()) do
   ON_STATION[name] = true
 end
+ON_STATION[shared.connector_slot] = true
 for type in pairs(defines.prototypes.entity) do
   for _, prototype in pairs(data.raw[type] or {}) do
     local ok, mask = pcall(collision_mask_util.get_mask, prototype)

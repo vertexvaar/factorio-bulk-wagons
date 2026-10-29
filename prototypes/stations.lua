@@ -425,6 +425,21 @@ data:extend(blockers)
 -- its blockers, only with other buildings and belts.
 local connector_mask = { layers = { item = true, object = true, [shared.loader_layer] = true } }
 local base_loader = data.raw["loader-1x1"]["loader-1x1"]
+
+-- The second rim tile a silo connector's conveyor takes: blocks other connectors there.
+data:extend({
+  {
+    type = "simple-entity-with-owner",
+    name = shared.connector_slot,
+    hidden = true,
+    flags = { "not-blueprintable", "not-deconstructable", "not-on-map", "placeable-off-grid", "no-copy-paste",
+      "not-upgradable", "not-selectable-in-game" },
+    selectable_in_game = false,
+    collision_box = { { -0.4, -0.4 }, { 0.4, 0.4 } },
+    collision_mask = { layers = { object = true } },
+    picture = util.empty_sprite(),
+  },
+})
 local previous = {}
 local order = 0
 for _, def in ipairs(shared.connectors) do

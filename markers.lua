@@ -110,7 +110,17 @@ local function draw_connectors(player, def)
       for _, tile in pairs(shared.rim_tiles(e.position, record.base, record.variant)) do
         local spec = { name = shared.connector_name(def, record.base), position = tile, force = player.force,
           direction = shared.outward(record.variant, tile.side), build_check_type = defines.build_check_type.manual }
-        if open[tile.side] and prototypes.entity[spec.name] and surface.can_place_entity(spec) then
+        local fits = open[tile.side] and prototypes.entity[spec.name] and surface.can_place_entity(spec)
+        if fits and shared.needs_slot(record.base) then
+          -- the silo's conveyor also takes the next rim tile of the side
+          local dx, dy = shared.slot_offset(record.variant, tile.side)
+          local next = { x = tile.x + dx, y = tile.y + dy }
+          spec.position = next
+          fits = shared.rim_side(e.position, record.base, record.variant, next) == tile.side
+            and surface.can_place_entity(spec)
+          spec.position = tile
+        end
+        if fits then
           objects[#objects + 1] = rendering.draw_sprite({
             sprite = SPRITE,
             orientation = shared.rail_is_vertical(record.variant) and 0.25 or 0,

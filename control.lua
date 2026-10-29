@@ -66,6 +66,7 @@ local function init_storage()
   storage.cargo = storage.cargo or {} -- wagon unit_number -> { wagon, render, frame, item }
   storage.drained = storage.drained or {} -- wagon unit_number -> tick a pit last took goods out
   storage.ghost_checks = storage.ghost_checks or {} -- station ghosts placed by hand, checked next tick
+  storage.slots = storage.slots or {} -- silo connector unit_number -> slot entity on the next rim tile
   -- the data stage reports which generated graphics exist
   local info = prototypes.mod_data["bulk-wagons-graphics"]
   storage.has_load_animation = info ~= nil and info.data.load == true
@@ -202,6 +203,13 @@ local CONNECTOR_LIST = {} -- 1x1 connector names that exist, filled on init/load
 local LEGACY_CONNECTOR_LIST = {}
 local STATION_LIST = {} -- bunker and silo names that exist
 local dock_connectors -- defined with the connectors below
+
+-- The slot that holds the second tile of a silo connector.
+local function drop_slot(unit_number)
+  local slot = storage.slots[unit_number]
+  if slot and slot.valid then slot.destroy() end
+  storage.slots[unit_number] = nil
+end
 -- just above the station picture ("lower-object-above-shadow")
 local BASE_MASK_LAYER = "lower-object-overlay"
 local ANIMATION_SPEED = 0.25
@@ -423,6 +431,7 @@ local function remove_station(unit_number, buffer, removing)
           end
         end
         buffer.insert({ name = CONNECTORS[connector.name].def.name, count = 1, quality = connector.quality })
+        drop_slot(connector.unit_number)
         connector.destroy()
       end
     end
@@ -678,7 +687,44 @@ local function connector_spot(surface, position, ghosts, except)
   local count =
     shared.connectors_on_side(surface, station.position, station.base, station.variant, side, CONNECTOR_LIST, except)
   if count >= shared.connectors_per_side then return nil, nil, "bulk-wagons.side-full" end
+  if shared.needs_slot(station.base) then
+    -- the conveyor also needs the next rim tile of the same side, free of other connectors
+    local dx, dy = shared.slot_offset(station.variant, side)
+    local next = { x = position.x + dx, y = position.y + dy }
+    local own = except and except.valid and except.type ~= "entity-ghost" and storage.slots[except.unit_number]
+    if shared.rim_side(station.position, station.base, station.variant, next) ~= side then
+      return nil, nil, "bulk-wagons.needs-room"
+    end
+    for _, at in pairs({ next, position }) do
+      local area = { { at.x - 0.1, at.y - 0.1 }, { at.x + 0.1, at.y + 0.1 } }
+      for _, filter in pairs({ { name = CONNECTOR_LIST, area = area }, { ghost_name = CONNECTOR_LIST, area = area },
+        { name = shared.connector_slot, area = area } }) do
+        for _, other in pairs(surface.find_entities_filtered(filter)) do
+          if other ~= except and other ~= own then return nil, nil, "bulk-wagons.needs-room" end
+        end
+      end
+    end
+  end
   return station, side
+end
+
+local function ensure_slot(entity, station, side)
+  if not (shared.needs_slot(station.base) and entity.valid) then return end
+  local slot = storage.slots[entity.unit_number]
+  if slot and slot.valid then return end
+  local dx, dy = shared.slot_offset(station.variant, side)
+  local position = { x = entity.position.x + dx, y = entity.position.y + dy }
+  if shared.rim_side(station.position, station.base, station.variant, position) ~= side then return end
+  local area = { { position.x - 0.1, position.y - 0.1 }, { position.x + 0.1, position.y + 0.1 } }
+  if #entity.surface.find_entities_filtered({ name = CONNECTOR_LIST, area = area }) > 0 then return end
+  if #entity.surface.find_entities_filtered({ name = shared.connector_slot, area = area }) > 0 then return end
+  slot = entity.surface.create_entity({ name = shared.connector_slot, position = position, force = entity.force,
+    create_build_effect_smoke = false })
+  if slot then
+    slot.destructible = false
+    storage.slots[entity.unit_number] = slot
+    script.register_on_object_destroyed(entity)
+  end
 end
 
 -- Filters, circuit settings and wires of a loader, to put onto the one that replaces it
@@ -729,6 +775,7 @@ local function rebuild_loader(old, spec)
   local back = { name = old.name, position = old.position, direction = old.direction, type = old.loader_type,
     force = old.force, quality = old.quality, create_build_effect_smoke = false }
   spec.force, spec.quality, spec.create_build_effect_smoke = old.force, old.quality, false
+  if old.unit_number then drop_slot(old.unit_number) end
   old.destroy()
   local created = surface.create_entity(spec) or surface.create_entity(back)
   if created then
@@ -758,9 +805,11 @@ local function fit_connector(entity, station, side)
   -- writing a loader's type also turns it round, and it does not turn sideways, so a
   -- connector that needs another look, direction or type is built anew in its place
   if name ~= entity.name or direction ~= entity.direction or kind ~= entity.loader_type then
-    return rebuild_loader(entity, { name = name, position = entity.position, direction = direction, type = kind })
+    entity = rebuild_loader(entity, { name = name, position = entity.position, direction = direction, type = kind })
+  else
+    entity.update_connections()
   end
-  entity.update_connections()
+  if entity then ensure_slot(entity, station, side) end
   return entity
 end
 
@@ -981,7 +1030,9 @@ end
 local function on_removed(event)
   local entity = event.entity
   if not (entity and entity.valid) then return end
-  if is_wagon(entity) then
+  if CONNECTORS[entity.name] then
+    drop_slot(entity.unit_number)
+  elseif is_wagon(entity) then
     storage.wagons[entity.unit_number] = nil
   elseif variant_of[entity.name] then
     remove_station(entity.unit_number, event.buffer, entity)
@@ -994,7 +1045,10 @@ local function on_removed(event)
 end
 
 local function on_object_destroyed(event)
-  if event.type == defines.target_type.entity and event.useful_id then remove_station(event.useful_id) end
+  if event.type == defines.target_type.entity and event.useful_id then
+    remove_station(event.useful_id)
+    drop_slot(event.useful_id)
+  end
 end
 
 --------------------------------------------------------------------------------

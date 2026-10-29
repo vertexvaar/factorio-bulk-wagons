@@ -211,6 +211,21 @@ function shared.connectors_on_side(surface, position, base, variant, side, names
   return count
 end
 
+-- The silo's connector climbs sideways over the next rim tile (clockwise from its outward
+-- direction, seen from above), so it takes two tiles; a hidden slot entity holds the second.
+shared.connector_slot = "bulk-connector-slot"
+function shared.needs_slot(base) return base == shared.silo end
+
+function shared.slot_offset(variant, side)
+  local ox, oy
+  if variant % 2 == 1 then
+    ox, oy = side, 0
+  else
+    ox, oy = 0, side
+  end
+  return -oy, ox
+end
+
 -- The direction pointing away from the station on one of its long sides.
 function shared.outward(variant, side)
   if variant % 2 == 1 then return side > 0 and defines.direction.east or defines.direction.west end
