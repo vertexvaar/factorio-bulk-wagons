@@ -92,7 +92,7 @@ def collectors(p):
     hooded inlet per tile (open to the outside, where the connector's conveyor reaches in)
     and an inclined screw from its middle up into the gallery."""
     rig.layer("top")
-    z = 3.2
+    z = 2.2
     for sx in (-1, 1):
         x = sx * 2.2
         rig.box(f"trough{sx}", (x, 0, z), (0.4, 5.9, 0.26), p["red"], bevel=0.02, mask=True)
@@ -100,6 +100,7 @@ def collectors(p):
         for y in (-2.6, -0.9, 0.9, 2.6):
             rig.box(f"bracket{sx}{y}", (sx * 1.8, y, z - 0.08), (0.5, 0.08, 0.08), p["steel"], bevel=0.004)
             rig.cylinder(f"strut{sx}{y}", (sx * 2.25, y, z - 0.13), (sx * 1.5, y, z - 0.75), 0.02, p["steel"], verts=6)
+            rig.cylinder(f"hanger{sx}{y}", (sx * 2.3, y, z + 0.13), (sx * 1.5, y, z + 0.9), 0.015, p["steel"], verts=6)
         for k in range(6):
             y = -2.5 + k
             # inlet: a dark opening in the trough's outer wall under a small hood
