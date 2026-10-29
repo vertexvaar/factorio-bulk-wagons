@@ -194,9 +194,9 @@ function graphics.wagon_pictures(planet)
   if not set then return nil end
   local rotated =
     { direction_count = 128, back_equals_front = true, allow_low_quality_rotation = true, usage = "train" }
-  local function with(extra)
+  local function with(extra, base)
     local t = {}
-    for k, v in pairs(rotated) do
+    for k, v in pairs(base or rotated) do
       t[k] = v
     end
     for k, v in pairs(extra) do
@@ -204,7 +204,7 @@ function graphics.wagon_pictures(planet)
     end
     return t
   end
-  return {
+  local pictures = {
     rotated = {
       layers = {
         sheet(set.color, with({ tint = tint_for(planet) })),
@@ -213,6 +213,21 @@ function graphics.wagon_pictures(planet)
       },
     },
   }
+  -- the wagon tilted on rail ramps, laid out like the vanilla cargo wagon's sloped sheets
+  if set.sloped_color then
+    local sloped = { direction_count = set.sloped_color.frame_count, back_equals_front = true, usage = "train" }
+    local function tilted(extra) return with(extra, sloped) end
+    pictures.slope_angle_between_frames = 1.25
+    pictures.slope_back_equals_front = true
+    pictures.sloped = {
+      layers = {
+        sheet(set.sloped_color, tilted({ tint = tint_for(planet) })),
+        sheet(set.sloped_mask, tilted({ flags = { "mask" }, apply_runtime_tint = true })),
+        sheet(set.sloped_shadow, tilted({ draw_as_shadow = true })),
+      },
+    }
+  end
+  return pictures
 end
 
 return graphics
