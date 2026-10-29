@@ -89,11 +89,30 @@ def elevator(p):
             rotation=(tilt, 0, 0))
     rig.box("hood", (0, 0.22, 0.27), (0.64, 0.38, 0.32), p["olive"], bevel=0.02, mask=True)
     rig.box("hood_roof", (0, 0.22, 0.445), (0.66, 0.4, 0.03), p["steel"], bevel=0.006)
-    rig.box("hood_mouth", (0, 0.415, 0.2), (0.5, 0.01, 0.22), p["dark"], bevel=0)
-    for c in range(6):
-        rig.box(f"curtain{c}", (-0.21 + c * 0.084, 0.422, 0.19), (0.074, 0.008, 0.22), p["rubber"], bevel=0)
-    kit.rivets((-0.29, 0.42, 0.39), (0.29, 0.42, 0.39), 6, (0, 1, 0), radius=0.01)
+    overhang(p, 0.41)
     kit.cable([(-0.4, by - 0.05, head.z + 0.3), (0.2, by - 0.16, 1.0), (boot.x - 0.2, by - 0.24, 0.36)], "red")
+
+
+OVERHANG_END = 0.92  # how far the shroud reaches over the next belt tile (tile edge at 0.5)
+
+
+def overhang(p, y0):
+    """A low shroud from the hood front at y0 out over the start of the belt, like the
+    mouth of an underground belt: the goods appear (or vanish) under it, not on open belt.
+    Rubber curtains hang at its open end."""
+    y1 = OVERHANG_END
+    cy, ly = (y0 + y1) / 2, y1 - y0
+    rig.box("shroud", (0, cy, 0.17), (0.76, ly, 0.26), p["olive"], bevel=0.015, mask=True)
+    rig.box("shroud_roof", (0, cy, 0.31), (0.78, ly + 0.02, 0.03), p["steel"], bevel=0.005)
+    for k in range(3):
+        y = y0 + 0.06 + k * (ly - 0.12) / 2
+        rig.box(f"shroud_band{k}", (0, y, 0.17), (0.8, 0.035, 0.28), p["steel"], bevel=0.004)
+    for sx in (-1, 1):
+        kit.rivets((sx * 0.385, y0 + 0.08, 0.24), (sx * 0.385, y1 - 0.08, 0.24), 4, (sx, 0, 0), radius=0.009)
+    rig.box("shroud_mouth", (0, y1 + 0.005, 0.14), (0.66, 0.01, 0.2), p["dark"], bevel=0)
+    for c in range(8):
+        rig.box(f"curtain{c}", (-0.28 + c * 0.08, y1 + 0.012, 0.13), (0.072, 0.008, 0.2), p["rubber"], bevel=0)
+    kit.hazard((0, y1 + 0.012, 0.27), (0.7, 0.01, 0.05), stripes=6)
 
 
 def beam(name, a, b, section, mat, bevel=0.01, mask=False):
@@ -115,10 +134,8 @@ def conveyor(p):
     # tail hood: the belt runs in under it, the conveyor's tail drum takes the goods
     rig.box("tail", (0.02, 0.08, 0.24), (0.7, 0.6, 0.4), p["olive"], bevel=0.02, mask=True)
     rig.box("tail_roof", (0.02, 0.08, 0.455), (0.72, 0.62, 0.035), p["steel"], bevel=0.006)
-    rig.box("tail_mouth", (0.02, 0.385, 0.18), (0.54, 0.01, 0.24), p["dark"], bevel=0)
-    for c in range(7):
-        rig.box(f"skirt{c}", (-0.22 + c * 0.074, 0.392, 0.17), (0.066, 0.008, 0.22), p["rubber"], bevel=0)
-    kit.hazard((0.02, 0.395, 0.38), (0.62, 0.01, 0.07), stripes=6)
+    kit.hazard((0.02, 0.385, 0.38), (0.62, 0.01, 0.07), stripes=6)
+    overhang(p, 0.38)
     kit.rivets((-0.3, -0.225, 0.38), (0.34, -0.225, 0.38), 7, (0, -1, 0), radius=0.013)
     rig.cylinder("tail_axle", (-0.36, 0.08, 0.24), (0.4, 0.08, 0.24), 0.03, p["chrome"], verts=10)
     kit.motor((-0.34, -0.08, 0.5), axis="x", length=0.18, radius=0.065)
@@ -186,7 +203,7 @@ def build(kind):
     BUILDERS[kind](p)
     rig.sun()
     rig.fill_light()
-    rig.camera(4, 5, shift_y=1.4)
+    rig.camera(4, 5, shift_y=1.2)
 
 
 if __name__ == "__main__":
