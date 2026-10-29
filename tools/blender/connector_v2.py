@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import kit  # noqa: E402
 import rig  # noqa: E402
 
-SILO_INLET = (-0.12, 2.24)  # (y, z) of the collector inlet the silo conveyor reaches
+SILO_INLET = (0.0, 2.44)  # (y, z) of the mouth of the collector intake hopper the silo conveyor drops into
 
 
 def _objects():
@@ -96,44 +96,52 @@ def conveyor(p):
     from mathutils import Vector
     top = Vector((1.0, SILO_INLET[0], SILO_INLET[1]))
     # tail hood: the belt runs in under it, the conveyor's tail drum takes the goods
-    rig.box("tail", (0.02, 0.1, 0.2), (0.62, 0.52, 0.32), p["olive"], bevel=0.02, mask=True)
-    rig.box("tail_roof", (0.02, 0.1, 0.37), (0.64, 0.54, 0.03), p["steel"], bevel=0.006)
-    rig.box("tail_mouth", (0.02, 0.365, 0.16), (0.5, 0.01, 0.2), p["dark"], bevel=0)
-    for c in range(6):
-        rig.box(f"skirt{c}", (-0.19 + c * 0.084, 0.372, 0.15), (0.075, 0.008, 0.18), p["rubber"], bevel=0)
-    kit.hazard((0.02, 0.375, 0.31), (0.56, 0.01, 0.06), stripes=5)
-    kit.rivets((-0.26, -0.165, 0.3), (0.3, -0.165, 0.3), 6, (0, -1, 0), radius=0.012)
-    rig.cylinder("tail_axle", (-0.32, 0.1, 0.2), (0.36, 0.1, 0.2), 0.025, p["chrome"], verts=10)
-    kit.motor((-0.3, -0.05, 0.42), axis="x", length=0.16, radius=0.055)
-    # casing: a closed box girder climbing sideways to the collector inlet
-    start = Vector((0.22, -0.02, 0.3))
-    end = top + Vector((-0.12, 0.06, -0.06))
-    axis, length, rotation = beam("casing", start, end, (0.3, 0.22), p["olive"], mask=True)
-    for k in range(8):
-        c = start + axis * (0.1 + k * (length - 0.2) / 7)
-        rig.box(f"rib{k}", c, (0.36, 0.28, 0.03), p["steel"], bevel=0.004, rotation=rotation)
-    side = Vector((0, 0.115, 0))
+    rig.box("tail", (0.02, 0.08, 0.24), (0.7, 0.6, 0.4), p["olive"], bevel=0.02, mask=True)
+    rig.box("tail_roof", (0.02, 0.08, 0.455), (0.72, 0.62, 0.035), p["steel"], bevel=0.006)
+    rig.box("tail_mouth", (0.02, 0.385, 0.18), (0.54, 0.01, 0.24), p["dark"], bevel=0)
+    for c in range(7):
+        rig.box(f"skirt{c}", (-0.22 + c * 0.074, 0.392, 0.17), (0.066, 0.008, 0.22), p["rubber"], bevel=0)
+    kit.hazard((0.02, 0.395, 0.38), (0.62, 0.01, 0.07), stripes=6)
+    kit.rivets((-0.3, -0.225, 0.38), (0.34, -0.225, 0.38), 7, (0, -1, 0), radius=0.013)
+    rig.cylinder("tail_axle", (-0.36, 0.08, 0.24), (0.4, 0.08, 0.24), 0.03, p["chrome"], verts=10)
+    kit.motor((-0.34, -0.08, 0.5), axis="x", length=0.18, radius=0.065)
+    # casing: a heavy closed box girder climbing sideways to the collector intake
+    start = Vector((0.22, -0.04, 0.4))
+    end = top + Vector((-0.2, 0.0, 0.14))
+    axis, length, rotation = beam("casing", start, end, (0.44, 0.34), p["olive"], mask=True)
+    for k in range(9):
+        c = start + axis * (0.1 + k * (length - 0.2) / 8)
+        rig.box(f"rib{k}", c, (0.52, 0.42, 0.04), p["steel"], bevel=0.005, rotation=rotation)
+    side = Vector((0, 0.175, 0))
     for k in range(3):  # inspection doors on the camera side
-        c = start + axis * (0.45 + k * (length - 0.8) / 2) + side
-        rig.box(f"door{k}", c, (0.1, 0.01, 0.18), p["steel"], bevel=0.003, rotation=rotation)
-    kit.rivets(start + axis * 0.2 + side + Vector((0.12, 0, 0)), end - axis * 0.2 + side + Vector((0.12, 0, 0)), 9, (0, 1, 0),
-               radius=0.01)
+        c = start + axis * (0.5 + k * (length - 0.9) / 2) + side
+        rig.box(f"door{k}", c, (0.14, 0.012, 0.24), p["steel"], bevel=0.003, rotation=rotation)
+        rig.box(f"door_handle{k}", c + Vector((0.04, 0.01, 0)), (0.02, 0.01, 0.06), p["chrome"], bevel=0, rotation=rotation)
+    kit.rivets(start + axis * 0.2 + side + Vector((0.16, 0, 0)), end - axis * 0.2 + side + Vector((0.16, 0, 0)), 11, (0, 1, 0),
+               radius=0.011)
     # trestle on the second tile carrying the casing
     mid = start + axis * (length * 0.55)
-    for dy in (-0.16, 0.16):
-        rig.cylinder(f"post{dy}", (mid.x, mid.y + dy, 0.04), (mid.x, mid.y + dy, mid.z - 0.12), 0.025, p["steel"], verts=8)
-        kit.footing(mid.x, mid.y + dy, size=(0.14, 0.14), height=0.05)
-    rig.box("trestle_cap", (mid.x, mid.y, mid.z - 0.12), (0.12, 0.42, 0.05), p["steel"], bevel=0.004)
-    rig.cylinder("trestle_brace", (mid.x, mid.y - 0.16, 0.15), (mid.x, mid.y + 0.16, mid.z - 0.2), 0.012, p["steel"], verts=6)
-    rig.cylinder("stay", (0.35, 0.3, 0.02), (start.x + axis.x * 0.6, start.y + 0.1, start.z + axis.z * 0.6), 0.016,
+    for dy in (-0.2, 0.2):
+        rig.cylinder(f"post{dy}", (mid.x, mid.y + dy, 0.04), (mid.x, mid.y + dy, mid.z - 0.18), 0.032, p["steel"], verts=8)
+        kit.footing(mid.x, mid.y + dy, size=(0.16, 0.16), height=0.05)
+    rig.box("trestle_cap", (mid.x, mid.y, mid.z - 0.18), (0.14, 0.52, 0.06), p["steel"], bevel=0.004)
+    rig.cylinder("trestle_brace", (mid.x, mid.y - 0.2, 0.15), (mid.x, mid.y + 0.2, mid.z - 0.26), 0.014, p["steel"], verts=6)
+    rig.cylinder("stay", (0.38, 0.32, 0.02), (start.x + axis.x * 0.6, start.y + 0.14, start.z + axis.z * 0.6), 0.018,
                  p["steel"], verts=6)
-    # head: drive drum and the snout that reaches into the collector inlet
-    rig.box("head", (top.x - 0.12, top.y + 0.12, top.z + 0.06), (0.36, 0.34, 0.3), p["olive"], bevel=0.02, mask=True)
-    rig.box("snout", (top.x - 0.05, top.y - 0.14, top.z - 0.02), (0.28, 0.24, 0.16), p["steel"], bevel=0.01)
-    kit.rivets((top.x - 0.27, top.y + 0.295, top.z + 0.16), (top.x + 0.03, top.y + 0.295, top.z + 0.16), 4, (0, 1, 0),
-               radius=0.01)
-    kit.lamp((top.x - 0.22, top.y + 0.2, top.z + 0.24), "green", size=0.028)
-    kit.cable([(-0.3, -0.05, 0.5), (0.3, 0.1, 1.0), (top.x - 0.2, top.y + 0.2, top.z)], "red")
+    # head: drive drum housing over the intake, motor on the side, and a discharge hood
+    # that drops down into the hopper mouth with a dark open throat
+    rig.box("head", (top.x - 0.12, top.y, top.z + 0.32), (0.5, 0.46, 0.36), p["olive"], bevel=0.02, mask=True)
+    rig.box("head_roof", (top.x - 0.12, top.y, top.z + 0.515), (0.52, 0.48, 0.035), p["steel"], bevel=0.006)
+    rig.cylinder("head_axle", (top.x - 0.12, top.y - 0.29, top.z + 0.32), (top.x - 0.12, top.y + 0.29, top.z + 0.32), 0.035,
+                 p["chrome"], verts=12)
+    kit.gearbox((top.x - 0.12, top.y + 0.33, top.z + 0.26), size=(0.18, 0.12, 0.16))
+    kit.motor((top.x - 0.32, top.y + 0.33, top.z + 0.3), axis="x", length=0.2, radius=0.06)
+    rig.box("discharge", (top.x + 0.02, top.y, top.z + 0.08), (0.3, 0.32, 0.2), p["steel"], bevel=0.01)
+    rig.box("discharge_throat", (top.x + 0.02, top.y, top.z - 0.02), (0.22, 0.24, 0.02), p["dark"], bevel=0)
+    kit.rivets((top.x - 0.34, top.y + 0.235, top.z + 0.46), (top.x + 0.1, top.y + 0.235, top.z + 0.46), 5, (0, 1, 0),
+               radius=0.012)
+    kit.lamp((top.x - 0.3, top.y + 0.15, top.z + 0.54), "green", size=0.032)
+    kit.cable([(-0.34, -0.08, 0.6), (0.3, 0.1, 1.2), (top.x - 0.32, top.y + 0.3, top.z + 0.3)], "red")
 
 
 BUILDERS = {"bunker": elevator, "silo": conveyor}

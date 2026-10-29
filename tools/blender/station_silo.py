@@ -103,10 +103,13 @@ def collectors(p):
             rig.cylinder(f"hanger{sx}{y}", (sx * 2.3, y, z + 0.13), (sx * 1.5, y, z + 0.9), 0.015, p["steel"], verts=6)
         for k in range(6):
             y = -2.5 + k
-            # inlet: a dark opening in the trough's outer wall under a small hood
-            rig.box(f"inlet{sx}{k}", (sx * 2.405, y, z + 0.02), (0.02, 0.32, 0.16), p["dark"], bevel=0)
-            rig.box(f"inlet_hood{sx}{k}", (sx * 2.44, y, z + 0.14), (0.1, 0.4, 0.04), p["red"], bevel=0.005, mask=True)
-            kit.rivets((sx * 2.41, y - 0.18, z - 0.09), (sx * 2.41, y + 0.18, z - 0.09), 3, (sx, 0, 0), radius=0.01)
+            # intake: a hopper on the trough's outer wall, open at the top with a dark mouth
+            # and a striped lip, where the connector's conveyor drops the goods in
+            rig.box(f"intake{sx}{k}", (sx * 2.5, y, z + 0.08), (0.26, 0.46, 0.26), p["red"], bevel=0.01, mask=True)
+            rig.box(f"intake_mouth{sx}{k}", (sx * 2.5, y, z + 0.212), (0.18, 0.36, 0.01), p["dark"], bevel=0)
+            kit.hazard((sx * 2.5, y + 0.215, z + 0.2), (0.24, 0.02, 0.03), stripes=3)
+            kit.hazard((sx * 2.5, y - 0.215, z + 0.2), (0.24, 0.02, 0.03), stripes=3)
+            kit.rivets((sx * 2.635, y - 0.18, z - 0.02), (sx * 2.635, y + 0.18, z - 0.02), 4, (sx, 0, 0), radius=0.01)
         kit.motor((x, -2.75, z + 0.08), axis="y", length=0.2, radius=0.07)
         # screw up into the gallery
         kit.pipe([(x - sx * 0.1, 0.1, z + 0.1), (sx * 0.6, 0.1, HEAD - 0.2), (sx * 0.2, 0.1, BIN_TOP + 0.55)], 0.08, p["steel"])
