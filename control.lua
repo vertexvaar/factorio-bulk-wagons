@@ -591,6 +591,26 @@ local function port_busy(record)
   return false
 end
 
+-- A connector that finds its station's inventory empty (output) or full (input) goes to
+-- sleep and does not notice the goods the script moves in or out afterwards, so the
+-- connectors of a station are woken when its inventory stops being empty or full.
+local function wake_connectors(record)
+  if shared.is_legacy(record.base) then return end
+  local e = record.entity
+  for _, tile in pairs(shared.rim_tiles(e.position, record.base, record.variant)) do
+    local area = { { tile.x - 0.1, tile.y - 0.1 }, { tile.x + 0.1, tile.y + 0.1 } }
+    for _, connector in pairs(e.surface.find_entities_filtered({ name = CONNECTOR_LIST, area = area })) do
+      if connector.loader_container == record.store then
+        connector.update_connections()
+        if not connector.disabled_by_script then
+          connector.disabled_by_script = true
+          connector.disabled_by_script = false
+        end
+      end
+    end
+  end
+end
+
 local function transfer_pass()
   local budget = math.max(1, math.floor(settings.global["bulk-wagons-transfer-rate"].value * TRANSFER_PERIOD / 60))
   for unit_number, record in pairs(storage.stations) do
@@ -610,10 +630,16 @@ local function transfer_pass()
         local wagon_inventory = wagon.get_inventory(defines.inventory.cargo_wagon)
         local moved
         if UNLOADS[record.base] then
+          local was_empty = store.is_empty()
           moved = move_items(wagon_inventory, store, budget, nil)
-          if moved > 0 then storage.drained[wagon.unit_number] = game.tick end
+          if moved > 0 then
+            storage.drained[wagon.unit_number] = game.tick
+            if was_empty then wake_connectors(record) end
+          end
         else
+          local was_full = store.count_empty_stacks() == 0
           moved = move_items(store, wagon_inventory, budget, storage.allowed)
+          if moved > 0 and was_full then wake_connectors(record) end
         end
         -- the pit's extraction belt runs on while it has goods
         working = moved > 0 or record.base == shared.pit and not store.is_empty()
