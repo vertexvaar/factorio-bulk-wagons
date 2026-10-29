@@ -482,8 +482,10 @@ for _, def in ipairs(shared.connectors) do
         loader.resistances = source.resistances
       end
       loader.structure = graphics.connector_structure(def.tier, base) or loader.structure
-      -- standing up from the station: above its picture, among the other buildings
-      loader.structure_render_layer = "object"
+      -- standing up from the station: above its picture, among the other buildings; the
+      -- silo conveyor climbs to the collector trough, which the silo draws on
+      -- higher-object-under, so it has to go above that
+      loader.structure_render_layer = base == shared.silo and "higher-object-above" or "object"
       if previous[base] then data.raw["loader-1x1"][previous[base]].next_upgrade = loader.name end
       previous[base] = loader.name
       data:extend({ loader })

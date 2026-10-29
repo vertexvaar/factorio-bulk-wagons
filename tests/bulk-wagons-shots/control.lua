@@ -77,7 +77,8 @@ local function setup()
   local wagons, slot = train_at_stop(surface, true, 1, -36, 3, red)
   wagons[1].get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 2000 })
   s.bunker = station(surface, "bulk-unloading-bunker", { 1, slot(1) })
-  local yb = slot(1)
+  -- align_station moves the station onto the wagon, which can sit half a slot off
+  local yb = s.bunker.position.y
   for _, y in pairs({ yb - 2.5, yb + 0.5 }) do
     connector(surface, "bulk-connector-bunker", { 4.5, y }, defines.direction.east, "output")
     belt_run(surface, "transport-belt", { 5.5, y }, { 1, 0 }, 8, defines.direction.east)
@@ -86,7 +87,7 @@ local function setup()
   belt_run(surface, "fast-transport-belt", { -3.5, yb - 0.5 }, { -1, 0 }, 8, defines.direction.west)
   s.silo = station(surface, "bulk-loading-silo", { 1, slot(2) })
   remote.call("bulk-wagons", "get_inventory", s.silo).insert({ name = "coal", count = 2500 })
-  local ys = slot(2)
+  local ys = s.silo.position.y
   -- silo connectors take the next rim tile clockwise too: south on the east side, north on the west
   connector(surface, "bulk-connector-bunker", { 3.5, ys - 1.5 }, defines.direction.west, "input")
   s.in_belts = belt_run(surface, "transport-belt", { 11.5, ys - 1.5 }, { -1, 0 }, 8, defines.direction.west)
@@ -104,10 +105,10 @@ local function setup()
   for _, e in pairs({ b2, s2 }) do
     remote.call("bulk-wagons", "station_color", e, { r = 0.18, g = 0.43, b = 0.66 })
   end
-  connector(surface, "bulk-connector-bunker", { hslot(1) - 0.5, 30.5 }, defines.direction.south, "output")
-  belt_run(surface, "transport-belt", { hslot(1) - 0.5, 31.5 }, { 0, 1 }, 6, defines.direction.south)
-  connector(surface, "bulk-connector-bunker", { hslot(3) + 0.5, 29.5 }, defines.direction.north, "input")
-  s.in_belts3 = belt_run(surface, "transport-belt", { hslot(3) + 0.5, 36.5 }, { 0, -1 }, 7, defines.direction.north)
+  connector(surface, "bulk-connector-bunker", { b2.position.x - 0.5, 30.5 }, defines.direction.south, "output")
+  belt_run(surface, "transport-belt", { b2.position.x - 0.5, 31.5 }, { 0, 1 }, 6, defines.direction.south)
+  connector(surface, "bulk-connector-bunker", { s2.position.x + 0.5, 29.5 }, defines.direction.north, "input")
+  s.in_belts3 = belt_run(surface, "transport-belt", { s2.position.x + 0.5, 36.5 }, { 0, -1 }, 7, defines.direction.north)
   storage.s = s
 end
 
