@@ -316,7 +316,7 @@ def render_sloped(out, frames):
     build()
     # a larger frame for the raised end and the long east-west shadow; the shadow
     # falls on the ramp, which tilts with the wagon (like vanilla's straight shadows)
-    rig.camera(12, 12, shift_y=1.3)
+    rig.camera(12, 15, shift_y=0.3)
     rig.shadow_catcher().parent = rig.root()
 
     def pose(i):
