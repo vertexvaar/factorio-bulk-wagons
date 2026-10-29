@@ -39,6 +39,71 @@ local function connector(surface, position, direction, kind)
   return surface.find_entities_filtered({ type = "loader-1x1", position = position, radius = 0.1 })[1]
 end
 
+-- Fulgora: scrap goes into a bunker and out through its connectors, on a vertical and on a
+-- horizontal track (as in Sam's base, a train between two locomotives).
+local function setup_fulgora(s)
+  local surface = game.planets.fulgora.create_surface()
+  surface.request_to_generate_chunks({ 0, 0 }, 3)
+  surface.force_generate_chunk_requests()
+  for _, e in pairs(surface.find_entities_filtered({ area = { { -64, -64 }, { 64, 64 } } })) do
+    if e.type ~= "character" then e.destroy() end
+  end
+  local tiles = {}
+  for x = -64, 63 do
+    for y = -64, 63 do tiles[#tiles + 1] = { name = "lab-dark-1", position = { x, y } } end
+  end
+  surface.set_tiles(tiles)
+  s.fulgora = {}
+  local f = s.fulgora
+
+  -- vertical track at x = 1, like the Nauvis bunker scene
+  rails(surface, 1, -41, 41)
+  stop(surface, 1, -21, "Scrap N")
+  f.wagon_v = halted_train(surface, 1, -21)
+  f.wagon_v.get_inventory(defines.inventory.cargo_wagon).insert({ name = "scrap", count = 500 })
+  f.bunker_v = remote.call("bulk-wagons", "align_station",
+    surface.create_entity({ name = "bulk-unloading-bunker", position = { 1, -11 }, force = "player" }))
+  f.out_v = connector(surface, { 4.5, -10.5 }, defines.direction.east, "output")
+  f.belts_v = {}
+  for i = 0, 5 do
+    f.belts_v[#f.belts_v + 1] = surface.create_entity({ name = "transport-belt", position = { 5.5 + i, -10.5 },
+      direction = defines.direction.east, force = "player" })
+  end
+
+  -- horizontal track at y = 31, eastbound: locomotive, two wagons, locomotive backwards
+  for x = -41, 41, 2 do
+    surface.create_entity({ name = "straight-rail", position = { x, 31 }, direction = defines.direction.east, force = "player" })
+  end
+  local sx = 20
+  local st = surface.create_entity({ name = "train-stop", position = { sx, 33 }, direction = defines.direction.east, force = "player" })
+  st.backer_name = "Scrap E"
+  local front = surface.create_entity({ name = "locomotive", position = { sx - 3, 31 }, direction = defines.direction.east, force = "player" })
+  f.wagons_h = {}
+  for k = 1, 2 do
+    local at = { sx - 3 - 7 * k, 31 }
+    local w = surface.create_entity({ name = "bulk-wagon", position = at, direction = defines.direction.east, force = "player",
+      raise_built = true })
+    if not (w and w.valid) then w = surface.find_entities_filtered({ type = "cargo-wagon", position = at, radius = 3 })[1] end
+    w.get_inventory(defines.inventory.cargo_wagon).insert({ name = "scrap", count = 500 })
+    f.wagons_h[k] = w
+  end
+  surface.create_entity({ name = "locomotive", position = { sx - 24, 31 }, direction = defines.direction.west, force = "player" })
+  front.train.manual_mode = true
+  f.train_h = #front.train.carriages
+  f.bunkers_h, f.outs_h, f.belts_h = {}, {}, {}
+  for k = 1, 2 do
+    local x = sx - 3 - 7 * k
+    f.bunkers_h[k] = remote.call("bulk-wagons", "align_station",
+      surface.create_entity({ name = "bulk-unloading-bunker-2", position = { x, 31 }, force = "player" }))
+    local out = connector(surface, { x + 0.5, 34.5 }, defines.direction.south, "output")
+    f.outs_h[k] = out
+    for i = 0, 5 do
+      f.belts_h[#f.belts_h + 1] = surface.create_entity({ name = "transport-belt", position = { x + 0.5, 35.5 + i },
+        direction = defines.direction.south, force = "player" })
+    end
+  end
+end
+
 function v2.setup(s, report_fn)
   report = report_fn
   local surface = game.surfaces.nauvis
@@ -139,6 +204,8 @@ function v2.setup(s, report_fn)
     s.old_total = s.old_total + remote.call("bulk-wagons", "get_inventory", pit).insert({ name = "stone", count = 1000000 })
   end
   s.old_loader = legacy("bulk-loading-station", -2)
+
+  if game.planets.fulgora then setup_fulgora(s) end
 end
 
 function v2.after_setup(s)
@@ -247,6 +314,37 @@ function v2.check(s)
   local silos = surface.find_entities_filtered({ name = "bulk-loading-silo", area = { { xm - 4, -8 }, { xm + 4, 4 } } })
   report(#silos == 1 and silos[1].position.y == -4, "a loader at a wagon end becomes a silo on that wagon's slot",
     #silos == 1 and serpent.line(silos[1].position) or (#silos .. " silos"))
+  local f = s.fulgora
+  if f then
+    local function on(belts, name)
+      local n = 0
+      for _, belt in pairs(belts) do
+        for i = 1, 2 do n = n + belt.get_transport_line(i).get_item_count(name) end
+      end
+      return n
+    end
+    local function describe(bunker, out, wagon)
+      local store = bunker and bunker.valid and remote.call("bulk-wagons", "get_store", bunker)
+      return string.format("bunker=%s store=%s stored=%s docked=%s wagon=%s left=%s",
+        bunker and bunker.valid and bunker.name or "none", store and store.name or "none",
+        store and store.get_inventory(defines.inventory.chest).get_item_count("scrap") or "-",
+        tostring(out and out.valid and remote.call("bulk-wagons", "connector_docked", out)),
+        wagon.valid and wagon.name or "gone", wagon.valid and wagon.get_inventory(defines.inventory.cargo_wagon).get_item_count("scrap") or "-")
+    end
+    report(remote.call("bulk-wagons", "is_allowed", "scrap"), "scrap counts as bulk goods")
+    local left = f.wagon_v.get_inventory(defines.inventory.cargo_wagon).get_item_count("scrap")
+    local out = on(f.belts_v, "scrap")
+    report(left == 0 and out > 0, "Fulgora bunker unloads scrap onto the belt", describe(f.bunker_v, f.out_v, f.wagon_v) .. " belt=" .. out)
+    local details, ok = {}, f.train_h == 4
+    for k = 1, 2 do
+      local wagon = f.wagons_h[k]
+      ok = ok and wagon.get_inventory(defines.inventory.cargo_wagon).get_item_count("scrap") == 0
+      details[#details + 1] = describe(f.bunkers_h[k], f.outs_h[k], wagon)
+    end
+    local out_h = on(f.belts_h, "scrap")
+    report(ok and out_h > 0, "two Fulgora bunkers on a horizontal track unload scrap",
+      "carriages=" .. f.train_h .. " " .. table.concat(details, " | ") .. " belts=" .. out_h)
+  end
 end
 
 return v2
