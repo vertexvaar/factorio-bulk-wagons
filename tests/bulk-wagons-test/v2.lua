@@ -40,7 +40,9 @@ local function connector(surface, position, direction, kind)
 end
 
 -- Fulgora: scrap goes into a bunker and out through its connectors, on a vertical and on a
--- horizontal track (as in Sam's base, a train between two locomotives).
+-- horizontal track (as in Sam's base, a train between two locomotives). The connectors are
+-- built long before the scrap comes (fill_fulgora), so they have fallen asleep by then.
+-- A full silo gets its wagon late as well: its input connector must take goods again.
 local function setup_fulgora(s)
   local surface = game.planets.fulgora.create_surface()
   surface.request_to_generate_chunks({ 0, 0 }, 3)
@@ -60,7 +62,6 @@ local function setup_fulgora(s)
   rails(surface, 1, -41, 41)
   stop(surface, 1, -21, "Scrap N")
   f.wagon_v = halted_train(surface, 1, -21)
-  f.wagon_v.get_inventory(defines.inventory.cargo_wagon).insert({ name = "scrap", count = 500 })
   f.bunker_v = remote.call("bulk-wagons", "align_station",
     surface.create_entity({ name = "bulk-unloading-bunker", position = { 1, -11 }, force = "player" }))
   f.out_v = connector(surface, { 4.5, -10.5 }, defines.direction.east, "output")
@@ -84,7 +85,6 @@ local function setup_fulgora(s)
     local w = surface.create_entity({ name = "bulk-wagon", position = at, direction = defines.direction.east, force = "player",
       raise_built = true })
     if not (w and w.valid) then w = surface.find_entities_filtered({ type = "cargo-wagon", position = at, radius = 3 })[1] end
-    w.get_inventory(defines.inventory.cargo_wagon).insert({ name = "scrap", count = 500 })
     f.wagons_h[k] = w
   end
   surface.create_entity({ name = "locomotive", position = { sx - 24, 31 }, direction = defines.direction.west, force = "player" })
@@ -102,6 +102,42 @@ local function setup_fulgora(s)
         direction = defines.direction.south, force = "player" })
     end
   end
+
+  -- a full silo on a vertical track at x = 21, its input connector fed by a belt full of scrap
+  rails(surface, 21, -41, 41)
+  stop(surface, 21, -21, "Scrap S")
+  f.silo = remote.call("bulk-wagons", "align_station",
+    surface.create_entity({ name = "bulk-loading-silo", position = { 21, -11 }, force = "player" }))
+  local silo_inv = remote.call("bulk-wagons", "get_inventory", f.silo)
+  silo_inv.insert({ name = "scrap", count = 1000000 })
+  f.silo_full = silo_inv.get_item_count("scrap")
+  f.in_silo = connector(surface, { 18.5, -10.5 }, defines.direction.east, "input")
+  f.belts_s = {}
+  for i = 0, 5 do
+    local belt = surface.create_entity({ name = "transport-belt", position = { 17.5 - i, -10.5 }, direction = defines.direction.east,
+      force = "player" })
+    for line = 1, 2 do
+      while belt.get_transport_line(line).can_insert_at_back() do
+        belt.get_transport_line(line).insert_at_back({ name = "scrap", count = 1 })
+      end
+    end
+    f.belts_s[#f.belts_s + 1] = belt
+  end
+end
+
+-- The goods arrive long after the connectors were built.
+function v2.fill_fulgora(s)
+  local f = s.fulgora
+  if not f then return end
+  f.wagon_v.get_inventory(defines.inventory.cargo_wagon).insert({ name = "scrap", count = 500 })
+  for _, w in pairs(f.wagons_h) do
+    w.get_inventory(defines.inventory.cargo_wagon).insert({ name = "scrap", count = 500 })
+  end
+  f.belt_before = 0
+  for _, belt in pairs(f.belts_s) do
+    for i = 1, 2 do f.belt_before = f.belt_before + belt.get_transport_line(i).get_item_count("scrap") end
+  end
+  f.silo_wagon = halted_train(game.planets.fulgora.surface, 21, -21)
 end
 
 function v2.setup(s, report_fn)
@@ -344,6 +380,11 @@ function v2.check(s)
     local out_h = on(f.belts_h, "scrap")
     report(ok and out_h > 0, "two Fulgora bunkers on a horizontal track unload scrap",
       "carriages=" .. f.train_h .. " " .. table.concat(details, " | ") .. " belts=" .. out_h)
+    local loaded = f.silo_wagon.get_inventory(defines.inventory.cargo_wagon).get_item_count("scrap")
+    local belt_after = on(f.belts_s, "scrap")
+    report(loaded > 0 and belt_after < f.belt_before, "a full silo's input connector takes scrap again once the wagon loads",
+      string.format("full=%d loaded=%d belt %d -> %d docked=%s", f.silo_full, loaded, f.belt_before, belt_after,
+        tostring(remote.call("bulk-wagons", "connector_docked", f.in_silo))))
   end
 end
 
