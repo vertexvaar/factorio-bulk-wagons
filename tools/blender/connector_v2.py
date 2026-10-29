@@ -87,8 +87,9 @@ def elevator(p):
     tilt = math.atan2(-dy, dz)
     rig.box("spout", ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), (0.28, 0.18, length), p["steel"], bevel=0.01,
             rotation=(tilt, 0, 0))
-    rig.box("hood", (0, 0.22, 0.27), (0.64, 0.38, 0.32), p["olive"], bevel=0.02, mask=True)
-    rig.box("hood_roof", (0, 0.22, 0.445), (0.66, 0.4, 0.03), p["steel"], bevel=0.006)
+    # the hood covers the whole belt on the connector's tile, so no goods show beside the legs
+    rig.box("hood", (0, -0.035, 0.2), (0.92, 0.89, 0.32), p["olive"], bevel=0.02, mask=True)
+    rig.box("hood_roof", (0, -0.035, 0.375), (0.94, 0.91, 0.03), p["steel"], bevel=0.006)
     overhang(p, 0.41)
     kit.cable([(-0.4, by - 0.05, head.z + 0.3), (0.2, by - 0.16, 1.0), (boot.x - 0.2, by - 0.24, 0.36)], "red")
 
