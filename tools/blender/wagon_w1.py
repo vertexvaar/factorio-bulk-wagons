@@ -1,7 +1,12 @@
 """W1 'Cabred' hopper wagon, modelled after the Argentine ballast hopper.
 
 Run:  blender -b --factory-startup -P tools/blender/wagon_w1.py -- <out_dir> [frames...]
+      blender -b --factory-startup -P tools/blender/wagon_w1.py -- <out_dir> sloped [frames...]
 Frames are 0..127, frame i shows orientation i/256 (back equals front).
+Sloped (the wagon on a rail ramp) has 80 frames laid out like the vanilla cargo wagon's:
+0..39 north-south, 40..79 east-west; in each group 20 steps of 1.25 degrees with the
+north (east) end up, from the steepest down to the lowest, then 20 with the other end up
+from the lowest to the steepest. No frame is level.
 The cargo heaps are rendered at four fill levels: load1_* (a quarter full) to load4_* (full).
 The wheels are not modelled: Factorio draws its standard train wheels on top.
 """
@@ -292,9 +297,36 @@ def build(planet="nauvis"):
     rig.camera(8, 9, shift_y=1.3)
 
 
+SLOPE_STEP = math.radians(1.25)
+SLOPE_STEPS = 20
+
+
+def slope_of(i):
+    """Orientation and tilt (north or east end up is positive) of sloped frame i."""
+    k = i % (2 * SLOPE_STEPS)
+    steps = SLOPE_STEPS - k if k < SLOPE_STEPS else SLOPE_STEPS - 1 - k
+    return (0.25 if i >= 2 * SLOPE_STEPS else 0.0), steps * SLOPE_STEP
+
+
+def render_sloped(out, frames):
+    build()
+    # a taller frame for the raised end, and the ground under the lowered one
+    rig.camera(9, 11, shift_y=1.3)
+    rig.shadow_catcher().location.z = -math.sin(SLOPE_STEPS * SLOPE_STEP) * END_Y
+
+    def pose(i):
+        orientation, tilt = slope_of(i)
+        rig.root().rotation_euler = (tilt, 0, -orientation * 2 * math.pi)
+
+    rig.render_frames(out, frames, lambda i: slope_of(i)[0], passes=("color", "mask", "shadow"), samples=32, pose=pose)
+
+
 if __name__ == "__main__":
     a = rig.args()
     out = a[0]
+    if a[1:2] == ["sloped"]:
+        render_sloped(out, [int(x) for x in a[2:]] or list(range(4 * SLOPE_STEPS)))
+        sys.exit(0)
     frames = [int(x) for x in a[1:]] or list(range(128))
     build()
     rig.render_frames(out, frames, lambda i: i / 256, passes=("color", "mask", "shadow"), samples=32)
