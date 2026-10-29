@@ -67,6 +67,18 @@ def tinted(color, mask, tint):
     return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8))
 
 
+def colorized(color, mask, tint, gain=1.8, strength=0.8):
+    """The masked parts painted in the tint, keeping their shading; stronger than tinted(),
+    for icons, which have to show the colour at 32 px."""
+    c = np.asarray(color).astype(np.float32) / 255
+    m = np.asarray(mask).astype(np.float32)[..., 3:4] / 255 * strength
+    luma = (c[..., :3] @ np.array([0.3, 0.59, 0.11], dtype=np.float32))[..., None]
+    paint = luma * gain * np.array(tint, dtype=np.float32).reshape(1, 1, 3)
+    rgb = c[..., :3] * (1 - m) + paint * m
+    out = np.concatenate([rgb, c[..., 3:4]], axis=2)
+    return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8))
+
+
 def ground(w, h):
     rng = np.random.default_rng(1)
     g = np.full((h, w, 3), (88, 72, 50), dtype=np.float32)

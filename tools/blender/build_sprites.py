@@ -227,11 +227,12 @@ def icons(render_dir, out_dir):
     if os.path.isdir(w):
         wagon = pack.tinted(pack.load(w, "color", 40), pack.load(w, "mask", 40), WAGON_COLOR)
         fit(wagon, 64).save(os.path.join(out_dir, "bulk-wagon.png"))
-    src = os.path.join(render_dir, "connector")
-    if os.path.isdir(src):
-        for tier, tint in CONNECTOR_TINTS.items():
-            img = pack.tinted(pack.load(src, "color", 1, G), pack.load(src, "mask", 1, G), tint)
-            fit(img, 64).save(os.path.join(out_dir, f"connector-{tier}.png"))
+    for key in ("bunker", "silo"):
+        src = os.path.join(render_dir, f"icon-connector-{key}")
+        if os.path.isdir(src):
+            for tier, tint in CONNECTOR_TINTS.items():
+                img = pack.colorized(pack.load(src, "color", 0), pack.load(src, "mask", 0), tint)
+                fit(img, 64).save(os.path.join(out_dir, f"connector-{key}-{tier}.png"))
     for key, name in (("e1", "unloading-pit"), ("b3", "belt-loader"), ("b1", "loading-station"), ("bunker", "unloading-bunker"),
                       ("silo", "loading-silo")):
         src = os.path.join(render_dir, key, "v1")
