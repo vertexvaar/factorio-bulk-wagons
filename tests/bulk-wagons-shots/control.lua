@@ -77,20 +77,22 @@ local function setup()
   local wagons, slot = train_at_stop(surface, true, 1, -36, 3, red)
   wagons[1].get_inventory(defines.inventory.cargo_wagon).insert({ name = "iron-ore", count = 2000 })
   s.bunker = station(surface, "bulk-unloading-bunker", { 1, slot(1) })
-  local yb = slot(1)
+  -- align_station moves the station onto the wagon, which can sit half a slot off
+  local yb = s.bunker.position.y
   for _, y in pairs({ yb - 2.5, yb + 0.5 }) do
-    connector(surface, "bulk-connector", { 5, y }, defines.direction.east, "output")
-    belt_run(surface, "transport-belt", { 6.5, y }, { 1, 0 }, 8, defines.direction.east)
+    connector(surface, "bulk-connector-bunker", { 4.5, y }, defines.direction.east, "output")
+    belt_run(surface, "transport-belt", { 5.5, y }, { 1, 0 }, 8, defines.direction.east)
   end
-  connector(surface, "bulk-fast-connector", { -3, yb - 0.5 }, defines.direction.west, "output")
-  belt_run(surface, "fast-transport-belt", { -4.5, yb - 0.5 }, { -1, 0 }, 8, defines.direction.west)
+  connector(surface, "bulk-fast-connector-bunker", { -2.5, yb - 0.5 }, defines.direction.west, "output")
+  belt_run(surface, "fast-transport-belt", { -3.5, yb - 0.5 }, { -1, 0 }, 8, defines.direction.west)
   s.silo = station(surface, "bulk-loading-silo", { 1, slot(2) })
   remote.call("bulk-wagons", "get_inventory", s.silo).insert({ name = "coal", count = 2500 })
-  local ys = slot(2)
-  connector(surface, "bulk-connector", { 5, ys - 1.5 }, defines.direction.west, "input")
-  s.in_belts = belt_run(surface, "transport-belt", { 12.5, ys - 1.5 }, { -1, 0 }, 7, defines.direction.west)
-  connector(surface, "bulk-express-connector", { -3, ys + 1.5 }, defines.direction.east, "input")
-  s.in_belts2 = belt_run(surface, "express-transport-belt", { -10.5, ys + 1.5 }, { 1, 0 }, 7, defines.direction.east)
+  local ys = s.silo.position.y
+  -- silo connectors take the next rim tile clockwise too: south on the east side, north on the west
+  connector(surface, "bulk-connector-bunker", { 3.5, ys - 1.5 }, defines.direction.west, "input")
+  s.in_belts = belt_run(surface, "transport-belt", { 11.5, ys - 1.5 }, { -1, 0 }, 8, defines.direction.west)
+  connector(surface, "bulk-express-connector-bunker", { -1.5, ys + 1.5 }, defines.direction.east, "input")
+  s.in_belts2 = belt_run(surface, "express-transport-belt", { -10.5, ys + 1.5 }, { 1, 0 }, 9, defines.direction.east)
 
   -- east-west: the same in the other direction, station colours in the train's blue
   local blue = { r = 0.18, g = 0.43, b = 0.66, a = 0.5 }
@@ -103,8 +105,10 @@ local function setup()
   for _, e in pairs({ b2, s2 }) do
     remote.call("bulk-wagons", "station_color", e, { r = 0.18, g = 0.43, b = 0.66 })
   end
-  connector(surface, "bulk-connector", { hslot(1) - 0.5, 31 }, defines.direction.south, "output")
-  belt_run(surface, "transport-belt", { hslot(1) - 0.5, 32.5 }, { 0, 1 }, 6, defines.direction.south)
+  connector(surface, "bulk-connector-bunker", { b2.position.x - 0.5, 30.5 }, defines.direction.south, "output")
+  belt_run(surface, "transport-belt", { b2.position.x - 0.5, 31.5 }, { 0, 1 }, 6, defines.direction.south)
+  connector(surface, "bulk-connector-bunker", { s2.position.x + 0.5, 29.5 }, defines.direction.north, "input")
+  s.in_belts3 = belt_run(surface, "transport-belt", { s2.position.x + 0.5, 36.5 }, { 0, -1 }, 7, defines.direction.north)
   storage.s = s
 end
 
@@ -115,7 +119,7 @@ script.on_event(defines.events.on_tick, function(event)
     return
   end
   local s = storage.s
-  for _, belts in pairs({ s.in_belts, s.in_belts2 }) do
+  for _, belts in pairs({ s.in_belts, s.in_belts2, s.in_belts3 }) do
     for i = 1, 2 do
       local line = belts[1].get_transport_line(i)
       if line.can_insert_at_back() then line.insert_at_back({ name = "stone", count = 1 }) end

@@ -27,17 +27,78 @@ function shared.is_legacy(base) return base == shared.pit or base == shared.load
 shared.variant_count = 4
 function shared.variant_count_of(base) return shared.is_legacy(base) and 4 or 2 end
 
--- Half size of a bunker or silo: 3 tiles along the track and across it.
+-- Half size of a bunker or silo along the track (both are 6 tiles long).
 shared.station_half = 3
 
--- Connectors: loaders in the belt tiers that dock onto the long sides of a bunker or
--- silo. Built from the game's own (hidden) loaders; a tier exists when its loader does.
+-- Footprint of bunker and silo in tiles: across the track, along it. Since 0.5.0 the
+-- bunker is 8 tiles wide, so its connectors sit on a rim beside the gratings.
+shared.station_size = { [shared.bunker] = { 8, 6 }, [shared.silo] = { 6, 6 } }
+
+function shared.half_across(base) return shared.station_size[base][1] / 2 end
+
+-- Connectors: 1x1 loaders in the belt tiers that stand on the outer rim tiles of the
+-- long sides of a bunker or silo, at most connectors_per_side on each side. Each tier
+-- has one entity per station look (the bunker's elevator, the silo's chute); the item
+-- is shared and the script picks the look. The item name is also the name of the
+-- 2x1 connector of 0.4, kept hidden so old saves and blueprints can be converted.
+-- A tier exists when its belt does.
 shared.connectors = {
   { name = "bulk-connector", tier = "basic", loader = "loader", belt = "transport-belt", tech = "bulk-wagons" },
   { name = "bulk-fast-connector", tier = "fast", loader = "fast-loader", belt = "fast-transport-belt", tech = "logistics-2" },
   { name = "bulk-express-connector", tier = "express", loader = "express-loader", belt = "express-transport-belt", tech = "logistics-3" },
   { name = "bulk-turbo-connector", tier = "turbo", loader = "turbo-loader", belt = "turbo-transport-belt", tech = "turbo-transport-belt" },
 }
+shared.connectors_per_side = 3
+
+function shared.connector_name(def, base) return def.name .. (base == shared.silo and "-silo" or "-bunker") end
+
+-- Every 1x1 connector entity name.
+function shared.connector_names()
+  local names = {}
+  for _, def in pairs(shared.connectors) do
+    for _, base in pairs(shared.station_bases) do
+      names[#names + 1] = shared.connector_name(def, base)
+    end
+  end
+  return names
+end
+
+-- The rim tiles of a bunker or silo at position: { x, y, side } for every tile of the
+-- outer column on both long sides (side -1: west/north, 1: east/south).
+function shared.rim_tiles(position, base, variant)
+  local tiles = {}
+  local vertical = variant % 2 == 1
+  local edge = shared.half_across(base) - 0.5
+  for _, side in pairs({ -1, 1 }) do
+    for along = -shared.station_half + 0.5, shared.station_half - 0.5 do
+      local across = side * edge
+      tiles[#tiles + 1] = vertical and { x = position.x + across, y = position.y + along, side = side }
+        or { x = position.x + along, y = position.y + across, side = side }
+    end
+  end
+  return tiles
+end
+
+-- Which long side of a station at position the tile p is a rim tile of, or nil.
+function shared.rim_side(position, base, variant, p)
+  local vertical = variant % 2 == 1
+  local dx, dy = p.x - position.x, p.y - position.y
+  local across, along = vertical and dx or dy, vertical and dy or dx
+  local edge = shared.half_across(base) - 0.5
+  if math.abs(math.abs(across) - edge) > 0.01 or math.abs(along) > shared.station_half - 0.49 then return nil end
+  return across > 0 and 1 or -1
+end
+
+-- The area of the rim column on one side, for counting the connectors there.
+function shared.rim_area(position, base, variant, side)
+  local vertical = variant % 2 == 1
+  local across = side * (shared.half_across(base) - 0.5)
+  local h = shared.station_half - 0.1
+  if vertical then
+    return { { position.x + across - 0.4, position.y - h }, { position.x + across + 0.4, position.y + h } }
+  end
+  return { { position.x - h, position.y + across - 0.4 }, { position.x + h, position.y + across + 0.4 } }
+end
 
 -- Rolling stock stands 7 tiles apart. A train halts with the centre of its front
 -- carriage 3 tiles behind its train stop (measured), so the carriages of a halted
@@ -96,6 +157,7 @@ shared.control_offset = { -2.5, 0.5 } -- variant 1, rotated like the port
 -- too (data-final-fixes.lua), rails and trains do not, so a station fits across the
 -- track but not onto anything else.
 shared.collision_layer = "bulk_wagons_station"
+shared.loader_layer = "bulk_wagons_loader"
 
 -- Hidden constant combinator that puts a station's wagon readings on its network.
 shared.signals = "bulk-station-signals"
@@ -129,11 +191,47 @@ end
 function shared.blocker_name(w, h) return "bulk-blocker-" .. w .. "x" .. h end
 
 -- The solid strips of a station for variant 1 (rail north-south): { centre, size }.
--- The bunker's outer rim, 1 tile on either side; the silo everything beside the track.
+-- The bunker's outer rim (where its connectors stand), 1 tile on either side; the silo
+-- everything beside the track.
 shared.solid_parts = {
-  [shared.bunker] = { { { -2.5, 0 }, { 1, 6 } }, { { 2.5, 0 }, { 1, 6 } } },
+  [shared.bunker] = { { { -3.5, 0 }, { 1, 6 } }, { { 3.5, 0 }, { 1, 6 } } },
   [shared.silo] = { { { -2, 0 }, { 2, 6 } }, { { 2, 0 }, { 2, 6 } } },
 }
+
+-- How many connectors (and connector ghosts) stand on one side of a station; names: the
+-- connector entity names that exist. except: an entity left out of the count.
+function shared.connectors_on_side(surface, position, base, variant, side, names, except)
+  local area = shared.rim_area(position, base, variant, side)
+  local count = 0
+  for _, filter in pairs({ { name = names, area = area }, { ghost_name = names, area = area } }) do
+    for _, entity in pairs(surface.find_entities_filtered(filter)) do
+      if entity ~= except then count = count + 1 end
+    end
+  end
+  return count
+end
+
+-- A connector climbs sideways over the next rim tile (clockwise from its outward direction,
+-- seen from above): the silo's conveyor up to the bin, the bunker's elevator out of the pit.
+-- So it takes two tiles; a hidden slot entity holds the second.
+shared.connector_slot = "bulk-connector-slot"
+function shared.needs_slot(base) return base == shared.silo or base == shared.bunker end
+
+function shared.slot_offset(variant, side)
+  local ox, oy
+  if variant % 2 == 1 then
+    ox, oy = side, 0
+  else
+    ox, oy = 0, side
+  end
+  return -oy, ox
+end
+
+-- The direction pointing away from the station on one of its long sides.
+function shared.outward(variant, side)
+  if variant % 2 == 1 then return side > 0 and defines.direction.east or defines.direction.west end
+  return side > 0 and defines.direction.south or defines.direction.north
+end
 
 -- Wagon slots behind every train stop near position (within radius tiles), on a
 -- straight track through position. vertical: the track runs north-south. Returns the

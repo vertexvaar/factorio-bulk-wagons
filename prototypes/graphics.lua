@@ -134,14 +134,32 @@ function graphics.wagon_load()
   end
 end
 
--- The housing of a bulk connector in a belt tier (basic, fast, express, turbo), drawn
--- over the loader's belt; nil without renders.
-function graphics.connector_structure(tier)
+-- The housing of a 0.4 (2x1) bulk connector in a belt tier (basic, fast, express,
+-- turbo), drawn over the loader's belt; nil without renders.
+function graphics.legacy_connector_structure(tier)
   local set = sprites["connector-" .. tier]
   if not set then return nil end
   return {
     direction_in = { sheet = sheet(set["in"]) },
     direction_out = { sheet = sheet(set.out) },
+  }
+end
+
+-- The housing of a 1x1 connector on a bunker (elevator out of the pit) or silo (chute up
+-- to the bin), from the renders (connector-<bunker|silo>-<tier>) or the placeholder.
+function graphics.connector_structure(tier, base)
+  local key = base == shared.silo and "silo" or "bunker"
+  local set = sprites["connector-" .. key .. "-" .. tier]
+  if set then
+    return {
+      direction_in = { sheet = sheet(set["in"]) },
+      direction_out = { sheet = sheet(set.out) },
+    }
+  end
+  local file = "__bulk-wagons__/graphics/placeholder/connector-" .. key
+  return {
+    direction_in = { sheet = { filename = file .. "-in.png", width = 64, height = 64, scale = 0.5 } },
+    direction_out = { sheet = { filename = file .. "-out.png", width = 64, height = 64, scale = 0.5 } },
   }
 end
 

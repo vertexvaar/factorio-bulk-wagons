@@ -1,7 +1,8 @@
-"""Loading silo (0.4.0): a riveted silo bin on a braced steel portal over a whole wagon
-slot. Intake troughs along both long sides take the goods from the bulk connectors
-(a hooded inlet per tile); a bucket elevator on each side lifts them into the bin, and
-three bellows chutes, one per compartment, lower into the wagon to fill it.
+"""Loading silo (0.5.0): a riveted silo bin on a braced steel portal over a whole wagon
+slot. Along both long sides a collector trough at the foot of the bin has an inlet per
+tile, where the steep conveyors of the bulk connectors (connector_v2.py) discharge;
+screws carry the goods up into the gallery over the bins, and three bellows chutes,
+one per compartment, lower into the wagon to fill it.
 
 Run:  blender -b --factory-startup -P tools/blender/station_silo.py -- <out_dir> [variants...]
 Footprint for variant 1: 6 x 6 tiles, rail north-south through x in [-1, 1]. Variant 2
@@ -28,7 +29,6 @@ PORTAL_Z = 3.0
 BIN_BOTTOM, BIN_TOP = 3.45, 4.3
 HW, HD = 2.25, 2.85
 CHUTE_TOP, CHUTE_UP, CHUTE_DOWN = 3.1, 2.8, 2.05
-ELEV_X = 2.3
 SILO_R = 0.88
 HEAD = BIN_TOP + 0.6  # elevator heads, just above the gallery
 
@@ -72,53 +72,47 @@ def portal(p):
     kit.cable([(-2.0, -2.6, 0.76), (-1.62, -2.48, 1.2), (-1.52, -2.52, 2.9)], "green")
 
 
-def intakes(p):
-    """Intake troughs along the long sides: a hooded inlet per tile on the outer edge,
-    a drag chain in the trough running to the elevator boot in the middle."""
+def rim(p):
+    """Concrete strips along the long sides where the connectors stand, an anchor plate
+    per tile."""
     rig.layer("base")
     for sx in (-1, 1):
-        x = sx * 2.72
-        rig.box(f"trough{sx}", (x, 0, 0.16), (0.46, 5.9, 0.3), p["steel"], bevel=0.02)
-        rig.box(f"trough_floor{sx}", (x, 0, 0.32), (0.36, 5.8, 0.02), p["dark"], bevel=0)
-        for k in range(12):
-            rig.box(f"chain{sx}{k}", (x, -2.75 + k * 0.5, 0.335), (0.3, 0.04, 0.02), p["chrome"], bevel=0)
+        x = sx * 2.5
+        rig.box(f"rim{sx}", (x, 0, 0.03), (0.96, 5.96, 0.06), p["concrete"], bevel=0.01)
+        kit.hazard((sx * 2.04, 0, 0.065), (0.04, 5.9, 0.01), stripes=30, axis="y")
         for k in range(6):
             y = -2.5 + k
-            # inlet hood over the trough edge, open to the outside, rubber curtain strips
-            rig.box(f"hood{sx}{k}", (sx * 2.82, y, 0.5), (0.3, 0.72, 0.05), p["red"], bevel=0.01, mask=True)
-            kit.hazard((sx * 2.82, y, 0.535), (0.26, 0.64, 0.02), stripes=5, axis="y")
-            for s in (-1, 1):
-                rig.box(f"hood_side{sx}{k}{s}", (sx * 2.82, y + s * 0.35, 0.33), (0.3, 0.03, 0.34), p["red"], bevel=0.005,
-                        mask=True)
-            for c in range(7):
-                rig.box(f"curtain{sx}{k}{c}", (sx * 2.96, y - 0.27 + c * 0.09, 0.32), (0.012, 0.08, 0.3), p["rubber"], bevel=0)
-        kit.handrail([(sx * 2.45, -2.9, 0.33), (sx * 2.45, 2.9, 0.33)], height=0.35, posts_every=0.6)
+            rig.box(f"anchor{sx}{k}", (x, y, 0.07), (0.7, 0.7, 0.02), p["steel"], bevel=0.004)
+            kit.rivets((x - 0.3, y - 0.3, 0.08), (x + 0.3, y - 0.3, 0.08), 4, (0, 0, 1))
+            kit.rivets((x - 0.3, y + 0.3, 0.08), (x + 0.3, y + 0.3, 0.08), 4, (0, 0, 1))
 
 
-def elevators(p):
-    """A bucket elevator on each side, boot in the trough, head over the bin roof."""
+def collectors(p):
+    """A collector trough on brackets along each side at the foot of the bin, with a
+    hooded inlet per tile (open to the outside, where the connector's conveyor reaches in)
+    and an inclined screw from its middle up into the gallery."""
+    rig.layer("top")
+    z = 2.2
     for sx in (-1, 1):
-        x, y = sx * ELEV_X, 0.0
-        rig.layer("base")
-        rig.box(f"boot{sx}", (x, y, 0.5), (0.6, 0.62, 0.62), p["red"], bevel=0.02, mask=True)
-        kit.rivets((x - 0.27, y - 0.32, 0.72), (x + 0.27, y - 0.32, 0.72), 6, (0, -1, 0))
-        for dx in (-0.12, 0.12):
-            rig.box(f"leg_low{sx}{dx}", (x + dx, y, 1.15), (0.2, 0.38, 0.8), p["olive"], bevel=0.01)
-        rig.layer("top")
-        for dx in (-0.12, 0.12):
-            rig.box(f"leg_high{sx}{dx}", (x + dx, y, (1.55 + HEAD) / 2), (0.2, 0.38, HEAD - 1.55), p["olive"], bevel=0.01)
-        for k in range(7):
-            z = 1.7 + k * 0.45
-            rig.box(f"flange{sx}{k}", (x, y, z), (0.52, 0.44, 0.04), p["steel"], bevel=0.005)
-        rig.box(f"elev_head{sx}", (x, y, HEAD), (0.64, 0.52, 0.52), p["red"], bevel=0.02, mask=True)
-        kit.rivets((x - 0.3, y - 0.27, HEAD + 0.2), (x + 0.3, y - 0.27, HEAD + 0.2), 6, (0, -1, 0))
-        kit.motor((x, y - 0.48, HEAD + 0.12), axis="x", length=0.34, radius=0.12)
-        big = rig.gear(f"elev_gear_big{sx}", (x - 0.12, y - 0.3, HEAD - 0.02), 0.17, 0.04, 16, p["brass"], axis="y")
-        small = rig.gear(f"elev_gear_small{sx}", (x + 0.15, y - 0.3, HEAD + 0.16), 0.09, 0.04, 9, p["brass"], axis="y")
-        spinning.append((big, 2 * math.pi / 16))
-        spinning.append((small, -2 * math.pi / 9))
-        kit.pipe([(x - sx * 0.32, y + 0.1, HEAD), (sx * 0.6, y + 0.1, HEAD), (sx * 0.2, y + 0.1, BIN_TOP + 0.55)], 0.09, p["steel"])
-        kit.lamp((x - 0.2, y - 0.27, HEAD + 0.32), "amber")
+        x = sx * 2.2
+        rig.box(f"trough{sx}", (x, 0, z), (0.4, 5.9, 0.26), p["red"], bevel=0.02, mask=True)
+        rig.box(f"trough_lid{sx}", (x - sx * 0.04, 0, z + 0.145), (0.34, 5.92, 0.03), p["steel"], bevel=0.005)
+        for y in (-2.6, -0.9, 0.9, 2.6):
+            rig.box(f"bracket{sx}{y}", (sx * 1.8, y, z - 0.08), (0.5, 0.08, 0.08), p["steel"], bevel=0.004)
+            rig.cylinder(f"strut{sx}{y}", (sx * 2.25, y, z - 0.13), (sx * 1.5, y, z - 0.75), 0.02, p["steel"], verts=6)
+            rig.cylinder(f"hanger{sx}{y}", (sx * 2.3, y, z + 0.13), (sx * 1.5, y, z + 0.9), 0.015, p["steel"], verts=6)
+        for k in range(6):
+            y = -2.5 + k
+            # intake: a hopper on the trough's outer wall, open at the top with a dark mouth
+            # and a striped lip, where the connector's conveyor drops the goods in
+            rig.box(f"intake{sx}{k}", (sx * 2.5, y, z + 0.08), (0.26, 0.46, 0.26), p["red"], bevel=0.01, mask=True)
+            rig.box(f"intake_mouth{sx}{k}", (sx * 2.5, y, z + 0.212), (0.18, 0.36, 0.01), p["dark"], bevel=0)
+            kit.hazard((sx * 2.5, y + 0.215, z + 0.2), (0.24, 0.02, 0.03), stripes=3)
+            kit.hazard((sx * 2.5, y - 0.215, z + 0.2), (0.24, 0.02, 0.03), stripes=3)
+            kit.rivets((sx * 2.635, y - 0.18, z - 0.02), (sx * 2.635, y + 0.18, z - 0.02), 4, (sx, 0, 0), radius=0.01)
+        kit.motor((x, -2.75, z + 0.08), axis="y", length=0.2, radius=0.07)
+        # screw up into the gallery
+        kit.pipe([(x - sx * 0.1, 0.1, z + 0.1), (sx * 0.6, 0.1, HEAD - 0.2), (sx * 0.2, 0.1, BIN_TOP + 0.55)], 0.08, p["steel"])
     rig.layer("base")
 
 
@@ -176,8 +170,8 @@ def build():
     kit.reset()
     p = kit.palette()
     portal(p)
-    intakes(p)
-    elevators(p)
+    rim(p)
+    collectors(p)
     bin_and_chutes(p)
     rig.layer("base")
     rig.sun()

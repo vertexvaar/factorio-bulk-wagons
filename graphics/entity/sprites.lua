@@ -1064,25 +1064,25 @@ return {
   ["bunker-1"] = {
     ["base"] = {
       ["files"] = { "bunker-1-base.png" },
-      ["width"] = 430,
+      ["width"] = 558,
       ["height"] = 401,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -0.0898 }
+      ["shift"] = { 0.0156, -0.0898 }
     },
     ["base_mask"] = {
       ["files"] = { "bunker-1-base_mask.png" },
-      ["width"] = 376,
-      ["height"] = 395,
+      ["width"] = 388,
+      ["height"] = 387,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -0.0742 }
+      ["shift"] = { 0.0000, -0.0117 }
     },
     ["shadow"] = {
       ["files"] = { "bunker-1-shadow.png" },
-      ["width"] = 512,
+      ["width"] = 640,
       ["height"] = 668,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
@@ -1091,90 +1091,90 @@ return {
     },
     ["top_static"] = {
       ["files"] = { "bunker-1-top_static.png" },
-      ["width"] = 376,
+      ["width"] = 323,
       ["height"] = 309,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, 0.2383 }
+      ["shift"] = { 0.0234, 0.2383 }
     },
     ["idle"] = {
       ["files"] = { "bunker-1-idle.png" },
-      ["width"] = 376,
+      ["width"] = 325,
       ["height"] = 317,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, 0.1758 }
+      ["shift"] = { 0.0391, 0.1758 }
     },
     ["idle_mask"] = {
       ["files"] = { "bunker-1-idle_mask.png" },
-      ["width"] = 376,
-      ["height"] = 116,
+      ["width"] = 2,
+      ["height"] = 2,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, 1.7461 }
+      ["shift"] = { -4.9844, -5.5976 }
     },
     ["extend"] = {
       ["files"] = { "bunker-1-extend.png" },
-      ["width"] = 376,
+      ["width"] = 325,
       ["height"] = 337,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, 0.0196 }
+      ["shift"] = { 0.0391, 0.0196 }
     },
     ["extend_mask"] = {
       ["files"] = { "bunker-1-extend_mask.png" },
-      ["width"] = 376,
-      ["height"] = 116,
+      ["width"] = 2,
+      ["height"] = 2,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, 1.7461 }
+      ["shift"] = { -4.9844, -5.5976 }
     },
     ["work"] = {
       ["files"] = { "bunker-1-work.png" },
-      ["width"] = 376,
+      ["width"] = 325,
       ["height"] = 337,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, 0.0196 }
+      ["shift"] = { 0.0391, 0.0196 }
     },
     ["work_mask"] = {
       ["files"] = { "bunker-1-work_mask.png" },
-      ["width"] = 376,
-      ["height"] = 116,
+      ["width"] = 2,
+      ["height"] = 2,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, 1.7461 }
+      ["shift"] = { -4.9844, -5.5976 }
     }
   },
   ["bunker-2"] = {
     ["base"] = {
       ["files"] = { "bunker-2-base.png" },
       ["width"] = 390,
-      ["height"] = 429,
+      ["height"] = 559,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -0.0117 }
+      ["shift"] = { 0.0000, 0.0039 }
     },
     ["base_mask"] = {
       ["files"] = { "bunker-2-base_mask.png" },
-      ["width"] = 386,
-      ["height"] = 373,
+      ["width"] = 387,
+      ["height"] = 387,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -0.2773 }
+      ["shift"] = { -0.0078, -0.0117 }
     },
     ["shadow"] = {
       ["files"] = { "bunker-2-shadow.png" },
-      ["width"] = 512,
+      ["width"] = 640,
       ["height"] = 668,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
@@ -1183,86 +1183,86 @@ return {
     },
     ["top_static"] = {
       ["files"] = { "bunker-2-top_static.png" },
-      ["width"] = 370,
-      ["height"] = 261,
+      ["width"] = 347,
+      ["height"] = 248,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, 0.6602 }
+      ["shift"] = { 0.0078, 0.5586 }
     },
     ["idle"] = {
       ["files"] = { "bunker-2-idle.png" },
-      ["width"] = 370,
-      ["height"] = 298,
+      ["width"] = 347,
+      ["height"] = 285,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, 0.3711 }
+      ["shift"] = { 0.0078, 0.2696 }
     },
     ["idle_mask"] = {
       ["files"] = { "bunker-2-idle_mask.png" },
-      ["width"] = 370,
-      ["height"] = 44,
+      ["width"] = 17,
+      ["height"] = 31,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, 2.3555 }
+      ["shift"] = { 2.5547, 2.2539 }
     },
     ["extend"] = {
       ["files"] = { "bunker-2-extend.png" },
-      ["width"] = 370,
-      ["height"] = 302,
+      ["width"] = 347,
+      ["height"] = 289,
+      ["line_length"] = 8,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 8,
+      ["shift"] = { 0.0078, 0.2383 }
+    },
+    ["extend_mask"] = {
+      ["files"] = { "bunker-2-extend_mask.png" },
+      ["width"] = 17,
+      ["height"] = 31,
+      ["line_length"] = 8,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 8,
+      ["shift"] = { 2.5547, 2.2539 }
+    },
+    ["work"] = {
+      ["files"] = { "bunker-2-work.png" },
+      ["width"] = 348,
+      ["height"] = 276,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
       ["shift"] = { 0.0000, 0.3399 }
     },
-    ["extend_mask"] = {
-      ["files"] = { "bunker-2-extend_mask.png" },
-      ["width"] = 370,
-      ["height"] = 44,
-      ["line_length"] = 8,
-      ["lines_per_file"] = 1,
-      ["frame_count"] = 8,
-      ["shift"] = { 0.0000, 2.3555 }
-    },
-    ["work"] = {
-      ["files"] = { "bunker-2-work.png" },
-      ["width"] = 370,
-      ["height"] = 289,
-      ["line_length"] = 8,
-      ["lines_per_file"] = 1,
-      ["frame_count"] = 8,
-      ["shift"] = { 0.0000, 0.4414 }
-    },
     ["work_mask"] = {
       ["files"] = { "bunker-2-work_mask.png" },
-      ["width"] = 370,
-      ["height"] = 44,
+      ["width"] = 17,
+      ["height"] = 31,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, 2.3555 }
+      ["shift"] = { 2.5547, 2.2539 }
     }
   },
   ["silo-1"] = {
     ["base"] = {
       ["files"] = { "silo-1-base.png" },
-      ["width"] = 386,
-      ["height"] = 520,
+      ["width"] = 388,
+      ["height"] = 523,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -1.0906 }
+      ["shift"] = { 0.0000, -1.0672 }
     },
     ["base_mask"] = {
       ["files"] = { "silo-1-base_mask.png" },
-      ["width"] = 386,
-      ["height"] = 263,
+      ["width"] = 2,
+      ["height"] = 2,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -1.2860 }
+      ["shift"] = { -4.2344, -12.0594 }
     },
     ["shadow"] = {
       ["files"] = { "silo-1-shadow.png" },
@@ -1275,86 +1275,86 @@ return {
     },
     ["top_static"] = {
       ["files"] = { "silo-1-top_static.png" },
-      ["width"] = 386,
-      ["height"] = 633,
+      ["width"] = 344,
+      ["height"] = 626,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -2.1766 }
+      ["shift"] = { 0.0000, -2.2313 }
     },
     ["idle"] = {
       ["files"] = { "silo-1-idle.png" },
-      ["width"] = 386,
-      ["height"] = 633,
+      ["width"] = 344,
+      ["height"] = 626,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -2.1766 }
+      ["shift"] = { 0.0000, -2.2313 }
     },
     ["idle_mask"] = {
       ["files"] = { "silo-1-idle_mask.png" },
-      ["width"] = 386,
-      ["height"] = 614,
+      ["width"] = 342,
+      ["height"] = 607,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -2.0281 }
+      ["shift"] = { 0.0000, -2.0828 }
     },
     ["extend"] = {
       ["files"] = { "silo-1-extend.png" },
-      ["width"] = 386,
-      ["height"] = 633,
+      ["width"] = 344,
+      ["height"] = 626,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -2.1766 }
+      ["shift"] = { 0.0000, -2.2313 }
     },
     ["extend_mask"] = {
       ["files"] = { "silo-1-extend_mask.png" },
-      ["width"] = 386,
-      ["height"] = 614,
+      ["width"] = 342,
+      ["height"] = 607,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -2.0281 }
+      ["shift"] = { 0.0000, -2.0828 }
     },
     ["work"] = {
       ["files"] = { "silo-1-work.png" },
-      ["width"] = 386,
-      ["height"] = 633,
+      ["width"] = 344,
+      ["height"] = 626,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -2.1766 }
+      ["shift"] = { 0.0000, -2.2313 }
     },
     ["work_mask"] = {
       ["files"] = { "silo-1-work_mask.png" },
-      ["width"] = 386,
-      ["height"] = 614,
+      ["width"] = 342,
+      ["height"] = 607,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -2.0281 }
+      ["shift"] = { 0.0000, -2.0828 }
     }
   },
   ["silo-2"] = {
     ["base"] = {
       ["files"] = { "silo-2-base.png" },
-      ["width"] = 384,
-      ["height"] = 449,
+      ["width"] = 388,
+      ["height"] = 452,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -0.5360 }
+      ["shift"] = { 0.0000, -0.5125 }
     },
     ["base_mask"] = {
       ["files"] = { "silo-2-base_mask.png" },
-      ["width"] = 372,
-      ["height"] = 124,
+      ["width"] = 19,
+      ["height"] = 29,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -2.8875 }
+      ["shift"] = { -2.6016, -2.1453 }
     },
     ["shadow"] = {
       ["files"] = { "silo-2-shadow.png" },
@@ -1367,66 +1367,66 @@ return {
     },
     ["top_static"] = {
       ["files"] = { "silo-2-top_static.png" },
-      ["width"] = 378,
-      ["height"] = 631,
+      ["width"] = 384,
+      ["height"] = 424,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -2.0516 }
+      ["shift"] = { 0.0000, -1.8563 }
     },
     ["idle"] = {
       ["files"] = { "silo-2-idle.png" },
-      ["width"] = 378,
-      ["height"] = 631,
+      ["width"] = 384,
+      ["height"] = 424,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -2.0516 }
+      ["shift"] = { 0.0000, -1.8563 }
     },
     ["idle_mask"] = {
       ["files"] = { "silo-2-idle_mask.png" },
-      ["width"] = 372,
-      ["height"] = 631,
+      ["width"] = 384,
+      ["height"] = 354,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -2.0516 }
+      ["shift"] = { 0.0000, -1.9031 }
     },
     ["extend"] = {
       ["files"] = { "silo-2-extend.png" },
-      ["width"] = 378,
-      ["height"] = 631,
+      ["width"] = 384,
+      ["height"] = 424,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -2.0516 }
+      ["shift"] = { 0.0000, -1.8563 }
     },
     ["extend_mask"] = {
       ["files"] = { "silo-2-extend_mask.png" },
-      ["width"] = 372,
-      ["height"] = 631,
+      ["width"] = 384,
+      ["height"] = 354,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -2.0516 }
+      ["shift"] = { 0.0000, -1.9031 }
     },
     ["work"] = {
       ["files"] = { "silo-2-work.png" },
-      ["width"] = 378,
-      ["height"] = 631,
+      ["width"] = 384,
+      ["height"] = 424,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -2.0516 }
+      ["shift"] = { 0.0000, -1.8563 }
     },
     ["work_mask"] = {
       ["files"] = { "silo-2-work_mask.png" },
-      ["width"] = 372,
-      ["height"] = 631,
+      ["width"] = 384,
+      ["height"] = 354,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -2.0516 }
+      ["shift"] = { 0.0000, -1.9031 }
     }
   },
   ["connector-basic"] = {
@@ -1507,6 +1507,166 @@ return {
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
       ["shift"] = { 0.0000, -0.2114 }
+    }
+  },
+  ["connector-bunker-basic"] = {
+    ["out"] = {
+      ["files"] = { "connector-bunker-basic-out.png" },
+      ["width"] = 186,
+      ["height"] = 230,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -0.4238 }
+    },
+    ["in"] = {
+      ["files"] = { "connector-bunker-basic-in.png" },
+      ["width"] = 186,
+      ["height"] = 230,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -0.4238 }
+    }
+  },
+  ["connector-bunker-fast"] = {
+    ["out"] = {
+      ["files"] = { "connector-bunker-fast-out.png" },
+      ["width"] = 186,
+      ["height"] = 230,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -0.4238 }
+    },
+    ["in"] = {
+      ["files"] = { "connector-bunker-fast-in.png" },
+      ["width"] = 186,
+      ["height"] = 230,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -0.4238 }
+    }
+  },
+  ["connector-bunker-express"] = {
+    ["out"] = {
+      ["files"] = { "connector-bunker-express-out.png" },
+      ["width"] = 186,
+      ["height"] = 230,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -0.4238 }
+    },
+    ["in"] = {
+      ["files"] = { "connector-bunker-express-in.png" },
+      ["width"] = 186,
+      ["height"] = 230,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -0.4238 }
+    }
+  },
+  ["connector-bunker-turbo"] = {
+    ["out"] = {
+      ["files"] = { "connector-bunker-turbo-out.png" },
+      ["width"] = 186,
+      ["height"] = 230,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -0.4238 }
+    },
+    ["in"] = {
+      ["files"] = { "connector-bunker-turbo-in.png" },
+      ["width"] = 186,
+      ["height"] = 230,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -0.4238 }
+    }
+  },
+  ["connector-silo-basic"] = {
+    ["out"] = {
+      ["files"] = { "connector-silo-basic-out.png" },
+      ["width"] = 156,
+      ["height"] = 296,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -1.3613 }
+    },
+    ["in"] = {
+      ["files"] = { "connector-silo-basic-in.png" },
+      ["width"] = 156,
+      ["height"] = 296,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -1.3613 }
+    }
+  },
+  ["connector-silo-fast"] = {
+    ["out"] = {
+      ["files"] = { "connector-silo-fast-out.png" },
+      ["width"] = 156,
+      ["height"] = 296,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -1.3613 }
+    },
+    ["in"] = {
+      ["files"] = { "connector-silo-fast-in.png" },
+      ["width"] = 156,
+      ["height"] = 296,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -1.3613 }
+    }
+  },
+  ["connector-silo-express"] = {
+    ["out"] = {
+      ["files"] = { "connector-silo-express-out.png" },
+      ["width"] = 156,
+      ["height"] = 296,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -1.3613 }
+    },
+    ["in"] = {
+      ["files"] = { "connector-silo-express-in.png" },
+      ["width"] = 156,
+      ["height"] = 296,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -1.3613 }
+    }
+  },
+  ["connector-silo-turbo"] = {
+    ["out"] = {
+      ["files"] = { "connector-silo-turbo-out.png" },
+      ["width"] = 156,
+      ["height"] = 296,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -1.3613 }
+    },
+    ["in"] = {
+      ["files"] = { "connector-silo-turbo-in.png" },
+      ["width"] = 156,
+      ["height"] = 296,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 1,
+      ["frame_count"] = 4,
+      ["shift"] = { 0.0000, -1.3613 }
     }
   }
 }

@@ -9,7 +9,11 @@ local gfx = "__bulk-wagons__/graphics/placeholder/"
 -- built across them) or with trains, but must block buildings and belts (via their
 -- own layer, see shared.collision_layer). Players are blocked too, except on the
 -- pit whose grate is walkable.
-data:extend({ { type = "collision-layer", name = shared.collision_layer } })
+data:extend({
+  { type = "collision-layer", name = shared.collision_layer },
+  -- the game wants every two loaders to collide: the hidden ports and the connectors share this
+  { type = "collision-layer", name = shared.loader_layer },
+})
 local station_mask = { layers = { [shared.collision_layer] = true, player = true, transport_belt = true, is_object = true } }
 local walkable_mask = { layers = { [shared.collision_layer] = true, transport_belt = true, is_object = true } }
 
@@ -155,18 +159,20 @@ local function station_variants(def)
   return prototypes
 end
 
--- Bunker and silo: 6 x 6 tiles over one wagon, in two variants (1: rail north-south,
--- 2: rail east-west; the footprint is square, so either fits on either track and the
--- script turns it). The building blocks other buildings and belts; hidden blockers
+-- Bunker and silo over one wagon (shared.station_size: the bunker 8 x 6, the silo 6 x 6),
+-- in two variants (1: rail north-south, 2: rail east-west; the script turns them to the
+-- rail). The building blocks other buildings and belts; hidden blockers
 -- (shared.solid_parts) keep players and vehicles off its solid parts.
 local station_mask_v2 = { layers = { [shared.collision_layer] = true, transport_belt = true } }
 
 local function wagon_station(def)
   local prototypes = {}
-  local h = shared.station_half
+  local size = shared.station_size[def.name]
   for _, planet in pairs(shared.active_planets(mods)) do
     for variant = 1, shared.variant_count_of(def.name) do
       local name = shared.variant_name(def.name, variant, planet)
+      local hw, hh = size[1] / 2, size[2] / 2
+      if not shared.rail_is_vertical(variant) then hw, hh = hh, hw end
       local picture = graphics.station_picture(def.sprite, variant, planet)
         or {
           filename = gfx .. def.placeholder .. "-" .. variant .. ".png",
@@ -186,13 +192,16 @@ local function wagon_station(def)
         max_health = 1000,
         corpse = "big-remnants",
         dying_explosion = "big-explosion",
-        collision_box = { { -h + 0.1, -h + 0.1 }, { h - 0.1, h - 0.1 } },
-        selection_box = { { -h, -h }, { h, h } },
+        collision_box = { { -hw + 0.1, -hh + 0.1 }, { hw - 0.1, hh - 0.1 } },
+        selection_box = { { -hw, -hh }, { hw, hh } },
         collision_mask = station_mask_v2,
         render_layer = def.render_layer,
+        tall = def.tall,
         picture = picture,
       }
-      local store = window_entity(def, shared.store_name(def.name, variant, planet), h, h, { 0, 0 })
+      local store = window_entity(def, shared.store_name(def.name, variant, planet), hw, hh, { 0, 0 })
+      -- hidden with the tall buildings, so the wagon under the silo can be clicked
+      store.tall = def.tall
       -- as big as the three stations it replaces, so their goods fit on update
       store.inventory_size = math.max(1, math.floor(3 * wagon_slots * def.inventory + 0.5))
       store.inventory_type = "with_filters_and_bar"
@@ -320,7 +329,7 @@ local function make_port(name, speed, container_distance, rail_interaction)
   }
   port.selectable_in_game = false
   port.minable = nil
-  port.collision_mask = { layers = { transport_belt = true } }
+  port.collision_mask = { layers = { transport_belt = true, [shared.loader_layer] = true } }
   port.speed = speed.speed
   port.belt_animation_set = speed.belt_animation_set
   port.container_distance = container_distance
@@ -374,6 +383,7 @@ data:extend(wagon_station({
   placeholder = "loading-silo",
   preview_height = 4,
   render_layer = "lower-object-above-shadow",
+  tall = true,
   order = "a[train-system]-z[bulk]-d[loading-silo]",
   inventory = settings.startup["bulk-wagons-loader-multiplier"].value,
   ingredients = {
@@ -409,40 +419,105 @@ for _, parts in pairs(shared.solid_parts) do
 end
 data:extend(blockers)
 
--- Connectors: the game's loaders in each belt tier, docking only onto a bunker or silo
--- (the script takes back one built elsewhere). They never drop goods on the ground: an
--- output without a belt simply holds them.
-local connectors = {}
-local previous
+-- Connectors: 1x1 loaders in each belt tier that stand on the rim of a bunker or silo
+-- (the script takes back one built anywhere else). They never drop goods on the ground:
+-- an output without a belt simply holds them. They do not collide with the station or
+-- its blockers, only with other buildings and belts.
+local connector_mask = { layers = { item = true, object = true, [shared.loader_layer] = true } }
+local base_loader = data.raw["loader-1x1"]["loader-1x1"]
+
+-- The second rim tile a silo connector's conveyor takes: blocks other connectors there.
+data:extend({
+  {
+    type = "simple-entity-with-owner",
+    name = shared.connector_slot,
+    hidden = true,
+    flags = { "not-blueprintable", "not-deconstructable", "not-on-map", "placeable-off-grid", "no-copy-paste",
+      "not-upgradable", "not-selectable-in-game" },
+    selectable_in_game = false,
+    collision_box = { { -0.4, -0.4 }, { 0.4, 0.4 } },
+    collision_mask = { layers = { object = true } },
+    picture = util.empty_sprite(),
+  },
+})
+local previous = {}
+local order = 0
 for _, def in ipairs(shared.connectors) do
   local source = data.raw.loader[def.loader]
   local belt = data.raw["transport-belt"][def.belt]
-  if source and belt then
-    local loader = table.deepcopy(source)
-    loader.name = def.name
-    loader.hidden = false
-    loader.minable = { mining_time = 0.1, result = def.name }
-    loader.placeable_by = nil
-    loader.next_upgrade = nil
-    loader.fast_replaceable_group = "bulk-connector"
-    loader.allow_rail_interaction = false
-    loader.speed = belt.speed
-    loader.localised_description = { "entity-description.bulk-connector" }
-    loader.structure = graphics.connector_structure(def.tier) or loader.structure
-    loader.icon = graphics.connector_icon(def.tier) or loader.icon
-    loader.icon_size = nil
-    if previous then data.raw.loader[previous].next_upgrade = def.name end
-    local source_item = data.raw.item[def.loader]
-    connectors[#connectors + 1] = loader
-    data:extend({ loader })
+  if belt then
+    order = order + 1
+    local icon = graphics.connector_icon(def.tier) or data.raw.item[def.loader] and data.raw.item[def.loader].icon
+      or base_loader.icon
+    for _, base in ipairs(shared.station_bases) do
+      local loader = table.deepcopy(base_loader)
+      loader.name = shared.connector_name(def, base)
+      loader.hidden = false
+      loader.hidden_in_factoriopedia = base ~= shared.bunker
+      loader.flags = { "placeable-neutral", "player-creation" }
+      loader.subgroup = "train-transport"
+      loader.localised_name = { "entity-name." .. def.name }
+      loader.localised_description = { "entity-description.bulk-connector" }
+      loader.minable = { mining_time = 0.1, result = def.name }
+      loader.placeable_by = { item = def.name, count = 1 }
+      loader.max_health = 170
+      loader.corpse = "small-remnants"
+      loader.collision_mask = connector_mask
+      -- above the station's window, which covers the whole station
+      loader.selection_priority = 70
+      loader.fast_replaceable_group = "bulk-connector"
+      loader.allow_rail_interaction = false
+      loader.container_distance = 1
+      loader.speed = belt.speed
+      loader.belt_animation_set = belt.belt_animation_set
+      loader.icon = icon
+      loader.icon_size = nil
+      if source then
+        loader.working_sound = source.working_sound
+        loader.open_sound, loader.close_sound = source.open_sound, source.close_sound
+        loader.circuit_connector = source.circuit_connector
+        loader.circuit_wire_max_distance = source.circuit_wire_max_distance
+        loader.max_belt_stack_size = source.max_belt_stack_size
+        loader.adjustable_belt_stack_size = source.adjustable_belt_stack_size
+        loader.resistances = source.resistances
+      end
+      loader.structure = graphics.connector_structure(def.tier, base) or loader.structure
+      -- standing up from the station: above its picture, among the other buildings; the
+      -- silo conveyor climbs to the collector trough, which the silo draws on
+      -- higher-object-under, so it has to go above that
+      loader.structure_render_layer = base == shared.silo and "higher-object-above" or "object"
+      if previous[base] then data.raw["loader-1x1"][previous[base]].next_upgrade = loader.name end
+      previous[base] = loader.name
+      data:extend({ loader })
+    end
+
+    -- the 2x1 connector of 0.4, hidden: the script turns it into a 1x1 one on the rim
+    if source then
+      local legacy = table.deepcopy(source)
+      legacy.name = def.name
+      legacy.hidden = true
+      legacy.minable = { mining_time = 0.1, result = def.name }
+      legacy.placeable_by = { item = def.name, count = 1 }
+      legacy.next_upgrade = nil
+      legacy.fast_replaceable_group = nil
+      legacy.allow_rail_interaction = false
+      legacy.speed = belt.speed
+      legacy.localised_name = { "entity-name." .. def.name }
+      legacy.localised_description = { "entity-description.bulk-connector" }
+      legacy.structure = graphics.legacy_connector_structure(def.tier) or legacy.structure
+      legacy.icon = icon
+      legacy.icon_size = nil
+      data:extend({ legacy })
+    end
+
     data:extend({
       {
         type = "item",
         name = def.name,
-        icon = graphics.connector_icon(def.tier) or source_item and source_item.icon or source.icon,
+        icon = icon,
         subgroup = "train-transport",
-        order = "a[train-system]-z[bulk]-e[connector]-" .. #connectors,
-        place_result = def.name,
+        order = "a[train-system]-z[bulk]-e[connector]-" .. order,
+        place_result = shared.connector_name(def, shared.bunker),
         stack_size = 50,
       },
       {
@@ -450,8 +525,8 @@ for _, def in ipairs(shared.connectors) do
         name = def.name,
         energy_required = 1,
         enabled = false,
-        ingredients = previous and {
-          { type = "item", name = previous, amount = 1 },
+        ingredients = previous.item and {
+          { type = "item", name = previous.item, amount = 1 },
           { type = "item", name = def.belt, amount = 5 },
           { type = "item", name = "iron-gear-wheel", amount = 10 },
         } or {
@@ -462,6 +537,6 @@ for _, def in ipairs(shared.connectors) do
         results = { { type = "item", name = def.name, amount = 1 } },
       },
     })
-    previous = def.name
+    previous.item = def.name
   end
 end
