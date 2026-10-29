@@ -1275,7 +1275,7 @@ return {
     },
     ["top_static"] = {
       ["files"] = { "silo-1-top_static.png" },
-      ["width"] = 324,
+      ["width"] = 344,
       ["height"] = 626,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
@@ -1284,7 +1284,7 @@ return {
     },
     ["idle"] = {
       ["files"] = { "silo-1-idle.png" },
-      ["width"] = 324,
+      ["width"] = 344,
       ["height"] = 626,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
@@ -1293,7 +1293,7 @@ return {
     },
     ["idle_mask"] = {
       ["files"] = { "silo-1-idle_mask.png" },
-      ["width"] = 324,
+      ["width"] = 342,
       ["height"] = 607,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
@@ -1302,7 +1302,7 @@ return {
     },
     ["extend"] = {
       ["files"] = { "silo-1-extend.png" },
-      ["width"] = 324,
+      ["width"] = 344,
       ["height"] = 626,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
@@ -1311,7 +1311,7 @@ return {
     },
     ["extend_mask"] = {
       ["files"] = { "silo-1-extend_mask.png" },
-      ["width"] = 324,
+      ["width"] = 342,
       ["height"] = 607,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
@@ -1320,7 +1320,7 @@ return {
     },
     ["work"] = {
       ["files"] = { "silo-1-work.png" },
-      ["width"] = 324,
+      ["width"] = 344,
       ["height"] = 626,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
@@ -1329,7 +1329,7 @@ return {
     },
     ["work_mask"] = {
       ["files"] = { "silo-1-work_mask.png" },
-      ["width"] = 324,
+      ["width"] = 342,
       ["height"] = 607,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
@@ -1386,11 +1386,11 @@ return {
     ["idle_mask"] = {
       ["files"] = { "silo-2-idle_mask.png" },
       ["width"] = 384,
-      ["height"] = 333,
+      ["height"] = 354,
       ["line_length"] = 1,
       ["lines_per_file"] = 1,
       ["frame_count"] = 1,
-      ["shift"] = { 0.0000, -1.9110 }
+      ["shift"] = { 0.0000, -1.9031 }
     },
     ["extend"] = {
       ["files"] = { "silo-2-extend.png" },
@@ -1404,11 +1404,11 @@ return {
     ["extend_mask"] = {
       ["files"] = { "silo-2-extend_mask.png" },
       ["width"] = 384,
-      ["height"] = 333,
+      ["height"] = 354,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -1.9110 }
+      ["shift"] = { 0.0000, -1.9031 }
     },
     ["work"] = {
       ["files"] = { "silo-2-work.png" },
@@ -1422,11 +1422,11 @@ return {
     ["work_mask"] = {
       ["files"] = { "silo-2-work_mask.png" },
       ["width"] = 384,
-      ["height"] = 333,
+      ["height"] = 354,
       ["line_length"] = 8,
       ["lines_per_file"] = 1,
       ["frame_count"] = 8,
-      ["shift"] = { 0.0000, -1.9110 }
+      ["shift"] = { 0.0000, -1.9031 }
     }
   },
   ["connector-basic"] = {
@@ -1512,161 +1512,161 @@ return {
   ["connector-bunker-basic"] = {
     ["out"] = {
       ["files"] = { "connector-bunker-basic-out.png" },
-      ["width"] = 68,
-      ["height"] = 168,
+      ["width"] = 186,
+      ["height"] = 230,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.8333 }
+      ["shift"] = { 0.0000, -0.4238 }
     },
     ["in"] = {
       ["files"] = { "connector-bunker-basic-in.png" },
-      ["width"] = 68,
-      ["height"] = 168,
+      ["width"] = 186,
+      ["height"] = 230,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.8333 }
+      ["shift"] = { 0.0000, -0.4238 }
     }
   },
   ["connector-bunker-fast"] = {
     ["out"] = {
       ["files"] = { "connector-bunker-fast-out.png" },
-      ["width"] = 68,
-      ["height"] = 168,
+      ["width"] = 186,
+      ["height"] = 230,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.8333 }
+      ["shift"] = { 0.0000, -0.4238 }
     },
     ["in"] = {
       ["files"] = { "connector-bunker-fast-in.png" },
-      ["width"] = 68,
-      ["height"] = 168,
+      ["width"] = 186,
+      ["height"] = 230,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.8333 }
+      ["shift"] = { 0.0000, -0.4238 }
     }
   },
   ["connector-bunker-express"] = {
     ["out"] = {
       ["files"] = { "connector-bunker-express-out.png" },
-      ["width"] = 68,
-      ["height"] = 168,
+      ["width"] = 186,
+      ["height"] = 230,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.8333 }
+      ["shift"] = { 0.0000, -0.4238 }
     },
     ["in"] = {
       ["files"] = { "connector-bunker-express-in.png" },
-      ["width"] = 68,
-      ["height"] = 168,
+      ["width"] = 186,
+      ["height"] = 230,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.8333 }
+      ["shift"] = { 0.0000, -0.4238 }
     }
   },
   ["connector-bunker-turbo"] = {
     ["out"] = {
       ["files"] = { "connector-bunker-turbo-out.png" },
-      ["width"] = 68,
-      ["height"] = 168,
+      ["width"] = 186,
+      ["height"] = 230,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.8333 }
+      ["shift"] = { 0.0000, -0.4238 }
     },
     ["in"] = {
       ["files"] = { "connector-bunker-turbo-in.png" },
-      ["width"] = 68,
-      ["height"] = 168,
+      ["width"] = 186,
+      ["height"] = 230,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -0.8333 }
+      ["shift"] = { 0.0000, -0.4238 }
     }
   },
   ["connector-silo-basic"] = {
     ["out"] = {
       ["files"] = { "connector-silo-basic-out.png" },
-      ["width"] = 146,
-      ["height"] = 246,
+      ["width"] = 156,
+      ["height"] = 296,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -1.2317 }
+      ["shift"] = { 0.0000, -1.3613 }
     },
     ["in"] = {
       ["files"] = { "connector-silo-basic-in.png" },
-      ["width"] = 146,
-      ["height"] = 246,
+      ["width"] = 156,
+      ["height"] = 296,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -1.2317 }
+      ["shift"] = { 0.0000, -1.3613 }
     }
   },
   ["connector-silo-fast"] = {
     ["out"] = {
       ["files"] = { "connector-silo-fast-out.png" },
-      ["width"] = 146,
-      ["height"] = 246,
+      ["width"] = 156,
+      ["height"] = 296,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -1.2317 }
+      ["shift"] = { 0.0000, -1.3613 }
     },
     ["in"] = {
       ["files"] = { "connector-silo-fast-in.png" },
-      ["width"] = 146,
-      ["height"] = 246,
+      ["width"] = 156,
+      ["height"] = 296,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -1.2317 }
+      ["shift"] = { 0.0000, -1.3613 }
     }
   },
   ["connector-silo-express"] = {
     ["out"] = {
       ["files"] = { "connector-silo-express-out.png" },
-      ["width"] = 146,
-      ["height"] = 246,
+      ["width"] = 156,
+      ["height"] = 296,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -1.2317 }
+      ["shift"] = { 0.0000, -1.3613 }
     },
     ["in"] = {
       ["files"] = { "connector-silo-express-in.png" },
-      ["width"] = 146,
-      ["height"] = 246,
+      ["width"] = 156,
+      ["height"] = 296,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -1.2317 }
+      ["shift"] = { 0.0000, -1.3613 }
     }
   },
   ["connector-silo-turbo"] = {
     ["out"] = {
       ["files"] = { "connector-silo-turbo-out.png" },
-      ["width"] = 146,
-      ["height"] = 246,
+      ["width"] = 156,
+      ["height"] = 296,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -1.2317 }
+      ["shift"] = { 0.0000, -1.3613 }
     },
     ["in"] = {
       ["files"] = { "connector-silo-turbo-in.png" },
-      ["width"] = 146,
-      ["height"] = 246,
+      ["width"] = 156,
+      ["height"] = 296,
       ["line_length"] = 4,
       ["lines_per_file"] = 1,
       ["frame_count"] = 4,
-      ["shift"] = { 0.0000, -1.2317 }
+      ["shift"] = { 0.0000, -1.3613 }
     }
   }
 }
