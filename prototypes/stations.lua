@@ -482,6 +482,8 @@ for _, def in ipairs(shared.connectors) do
         loader.resistances = source.resistances
       end
       loader.structure = graphics.connector_structure(def.tier, base) or loader.structure
+      -- standing up from the station: above its picture, among the other buildings
+      loader.structure_render_layer = "object"
       if previous[base] then data.raw["loader-1x1"][previous[base]].next_upgrade = loader.name end
       previous[base] = loader.name
       data:extend({ loader })

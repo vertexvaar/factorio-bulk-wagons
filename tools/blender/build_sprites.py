@@ -176,6 +176,22 @@ def main(render_dir):
                 "in": write_sheet([out[2], out[3], out[0], out[1]], o, f"connector-{tier}-in", 4),
             }
 
+    # 0.5.0 connectors on the station rim: bunker elevator and silo conveyor, same frame order
+    for key in ("bunker", "silo"):
+        src = os.path.join(render_dir, f"connector-{key}")
+        if not os.path.isdir(src):
+            continue
+        o = origin_of(src, G)
+        color = frames(src, "color", 4, G)
+        mask = frames(src, "mask", 4, G)
+        for tier, tint in CONNECTOR_TINTS.items():
+            out = [pack.tinted(c, m, tint) for c, m in zip(color, mask)]
+            turned = [out[2], out[3], out[0], out[1]]
+            meta[f"connector-{key}-{tier}"] = {
+                "out": write_sheet(turned, o, f"connector-{key}-{tier}-out", 4),
+                "in": write_sheet(turned, o, f"connector-{key}-{tier}-in", 4),
+            }
+
     # sets missing from render_dir keep their entries, so one part can be re-rendered alone
     blocks = {k: f"  [\"{k}\"] = {lua(v, '  ')}" for k, v in meta.items()}
     path = os.path.join(OUT, "sprites.lua")
