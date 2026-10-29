@@ -447,8 +447,9 @@ for _, def in ipairs(shared.connectors) do
   local belt = data.raw["transport-belt"][def.belt]
   if belt then
     order = order + 1
-    local icon = graphics.connector_icon(def.tier) or data.raw.item[def.loader] and data.raw.item[def.loader].icon
-      or base_loader.icon
+    local fallback = data.raw.item[def.loader] and data.raw.item[def.loader].icon or base_loader.icon
+    -- the item places the bunker's elevator, so it shows that one
+    local icon = graphics.connector_icon(def.tier, shared.bunker) or fallback
     for _, base in ipairs(shared.station_bases) do
       local loader = table.deepcopy(base_loader)
       loader.name = shared.connector_name(def, base)
@@ -470,7 +471,7 @@ for _, def in ipairs(shared.connectors) do
       loader.container_distance = 1
       loader.speed = belt.speed
       loader.belt_animation_set = belt.belt_animation_set
-      loader.icon = icon
+      loader.icon = graphics.connector_icon(def.tier, base) or fallback
       loader.icon_size = nil
       if source then
         loader.working_sound = source.working_sound

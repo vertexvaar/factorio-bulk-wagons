@@ -163,9 +163,12 @@ function graphics.connector_structure(tier, base)
   }
 end
 
-function graphics.connector_icon(tier)
-  local file = "__bulk-wagons__/graphics/icons/connector-" .. tier .. ".png"
-  if sprites["connector-" .. tier] then return file end
+-- The icon of a connector on a bunker (elevator) or silo (conveyor) in a belt tier, if rendered.
+function graphics.connector_icon(tier, base)
+  local key = base == shared.silo and "silo" or "bunker"
+  if sprites["connector-" .. key .. "-" .. tier] then
+    return "__bulk-wagons__/graphics/icons/connector-" .. key .. "-" .. tier .. ".png"
+  end
 end
 
 -- Tells the script which generated graphics exist (call once, at the end of the data stage).

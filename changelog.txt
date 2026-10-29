@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.5.1
+Date: 2026-10-29
+  Graphics:
+    - The bulk connectors have their own icons in their belt colour: the bucket elevator for the item, recipe and bunker connector, the silo conveyor for the silo connector. They used to show the old 2 x 1 housing.
+---------------------------------------------------------------------------------------------------
 Version: 0.5.0
 Date: 2026-10-29
   Major Features:
