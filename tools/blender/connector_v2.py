@@ -102,17 +102,17 @@ def overhang(p, y0):
     Rubber curtains hang at its open end."""
     y1 = OVERHANG_END
     cy, ly = (y0 + y1) / 2, y1 - y0
-    rig.box("shroud", (0, cy, 0.17), (0.76, ly, 0.26), p["olive"], bevel=0.015, mask=True)
-    rig.box("shroud_roof", (0, cy, 0.31), (0.78, ly + 0.02, 0.03), p["steel"], bevel=0.005)
+    rig.box("shroud", (0, cy, 0.17), (0.92, ly, 0.26), p["olive"], bevel=0.015, mask=True)
+    rig.box("shroud_roof", (0, cy, 0.31), (0.94, ly + 0.02, 0.03), p["steel"], bevel=0.005)
     for k in range(3):
         y = y0 + 0.06 + k * (ly - 0.12) / 2
-        rig.box(f"shroud_band{k}", (0, y, 0.17), (0.8, 0.035, 0.28), p["steel"], bevel=0.004)
+        rig.box(f"shroud_band{k}", (0, y, 0.17), (0.96, 0.035, 0.28), p["steel"], bevel=0.004)
     for sx in (-1, 1):
-        kit.rivets((sx * 0.385, y0 + 0.08, 0.24), (sx * 0.385, y1 - 0.08, 0.24), 4, (sx, 0, 0), radius=0.009)
-    rig.box("shroud_mouth", (0, y1 + 0.005, 0.14), (0.66, 0.01, 0.2), p["dark"], bevel=0)
-    for c in range(8):
-        rig.box(f"curtain{c}", (-0.28 + c * 0.08, y1 + 0.012, 0.13), (0.072, 0.008, 0.2), p["rubber"], bevel=0)
-    kit.hazard((0, y1 + 0.012, 0.27), (0.7, 0.01, 0.05), stripes=6)
+        kit.rivets((sx * 0.465, y0 + 0.08, 0.24), (sx * 0.465, y1 - 0.08, 0.24), 4, (sx, 0, 0), radius=0.009)
+    rig.box("shroud_mouth", (0, y1 + 0.005, 0.14), (0.82, 0.01, 0.2), p["dark"], bevel=0)
+    for c in range(10):
+        rig.box(f"curtain{c}", (-0.36 + c * 0.08, y1 + 0.012, 0.13), (0.072, 0.008, 0.2), p["rubber"], bevel=0)
+    kit.hazard((0, y1 + 0.012, 0.27), (0.86, 0.01, 0.05), stripes=7)
 
 
 def beam(name, a, b, section, mat, bevel=0.01, mask=False):
