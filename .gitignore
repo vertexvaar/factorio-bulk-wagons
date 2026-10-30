@@ -4,3 +4,4 @@ __pycache__/
 tools/blender/out/
 dist/
 tools/blender/scenes/
+tests/.env-probe/
