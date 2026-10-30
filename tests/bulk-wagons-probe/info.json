@@ -1,0 +1,9 @@
+{
+  "name": "bulk-wagons-probe",
+  "version": "0.0.1",
+  "title": "Bulk Wagons probe",
+  "author": "vertexvaar",
+  "factorio_version": "2.1",
+  "description": "Logs the state of all station connectors of a save. Development only.",
+  "dependencies": ["bulk-wagons"]
+}

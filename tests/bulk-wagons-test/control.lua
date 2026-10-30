@@ -365,6 +365,7 @@ script.on_event(defines.events.on_tick, function(event)
     v2.setup(storage.v2, report)
   end
   if age == 3 then v2.after_setup(storage.v2) end
+  if age == 300 then v2.fill_fulgora(storage.v2) end
   if age == 1 then
     -- stations side by side along the track, as a player places them
     local surface = game.surfaces.nauvis
