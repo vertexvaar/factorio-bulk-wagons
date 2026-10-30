@@ -1,6 +1,6 @@
 A bulk wagon for ores and other bulk goods, plus an unloading bunker and a loading silo that each serve a whole wagon. Trains halt, the goods pour through the wagon's bottom flaps or down three chutes, and belts carry them on through connectors in every belt tier. Factorio 2.1, Space Age optional.
 
-![Bunker and silo at a train stop](https://raw.githubusercontent.com/vertexvaar/factorio-bulk-wagons/main/previews/portal/1-overview.png)
+![Unloading bunkers under a halted train](https://raw.githubusercontent.com/vertexvaar/factorio-bulk-wagons/main/previews/portal/1-overview.png)
 
 ## The bulk wagon
 
@@ -15,7 +15,7 @@ A bulk wagon for ores and other bulk goods, plus an unloading bunker and a loadi
 - **Loading silo** (6 × 6 tiles, second research): stands over a whole wagon slot and fills the halted wagon through three chutes. Counts as a tall building, so with tall buildings hidden you can click the wagon under it.
 - Near a train stop, both snap onto the wagon slots of a halted train (7 tiles apart behind the stop), and green indicators show the free slots. Elsewhere they keep the 1-tile grid along the track; press R to turn them.
 
-![Unloading bunker close-up](https://raw.githubusercontent.com/vertexvaar/factorio-bulk-wagons/main/previews/portal/2-bunker.png)
+![A bunker empties a wagon through its flaps](https://raw.githubusercontent.com/vertexvaar/factorio-bulk-wagons/main/previews/portal/2-bunker.png)
 
 ## Bulk connectors
 
@@ -24,7 +24,9 @@ A bulk wagon for ores and other bulk goods, plus an unloading bunker and a loadi
 - On a bunker they always take goods out, on a silo they always feed it, whichever way you place them. They run at their belt tier's speed; without a belt they hold the goods back, nothing lands on the ground.
 - With a connector in the cursor, the free rim tiles show green placement indicators. Inserters work on both buildings too.
 
-![Loading silo close-up](https://raw.githubusercontent.com/vertexvaar/factorio-bulk-wagons/main/previews/portal/3-silo.png)
+![Loading silos fed by connectors](https://raw.githubusercontent.com/vertexvaar/factorio-bulk-wagons/main/previews/portal/3-silo.png)
+
+![Bunker connectors on blue belts](https://raw.githubusercontent.com/vertexvaar/factorio-bulk-wagons/main/previews/portal/4-connectors.png)
 
 ## Circuit network and colours
 
@@ -32,6 +34,8 @@ A bulk wagon for ores and other bulk goods, plus an unloading bunker and a loadi
 - Stations take a colour like the wagon: colour panel next to the station window, or copy it from a locomotive, wagon or train stop with Shift + right/left click. A station in the train's colour matches it.
 - Blueprints keep settings, colours and wires.
 - With Space Age every planet gives wagon and stations its own look; the right variant is placed automatically.
+
+![Unloading bunker on Fulgora](https://raw.githubusercontent.com/vertexvaar/factorio-bulk-wagons/main/previews/portal/5-fulgora.png)
 
 ## Performance
 
