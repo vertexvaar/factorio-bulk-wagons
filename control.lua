@@ -2,6 +2,7 @@ local shared = require("shared")
 local circuit = require("circuit")
 local colors = require("colors")
 local markers = require("markers")
+local covered = require("covered")
 
 local TRANSFER_PERIOD = 12 -- ticks between transfer passes (small steps, so goods flow steadily)
 local SWEEP_PERIOD = 60 -- ticks between checks for forbidden items in wagons
@@ -407,6 +408,7 @@ local function remove_station(unit_number, buffer, removing)
   if not record then return end
   storage.stations[unit_number] = nil
   storage.active[unit_number] = nil
+  covered.forget(unit_number)
   for _, key in pairs({ "overlay", "mask", "base_mask" }) do
     destroy(record, key)
   end
@@ -1068,6 +1070,7 @@ local function on_removed(event)
 end
 
 local function on_object_destroyed(event)
+  covered.on_object_destroyed(event.registration_number)
   if event.type == defines.target_type.entity and event.useful_id then
     remove_station(event.useful_id)
     drop_slot(event.useful_id)
@@ -1670,6 +1673,15 @@ script.on_configuration_changed(function()
       storage.wagons[unit_number] = nil
     end
   end
+  -- since 0.5.0 a bunker reaches over belts that stood beside the old one: mark them
+  local found = {} -- force -> count
+  for _, record in pairs(storage.stations) do
+    local n = covered.scan(record)
+    if n > 0 then found[record.entity.force] = (found[record.entity.force] or 0) + n end
+  end
+  for force, n in pairs(found) do
+    force.print({ "bulk-wagons.covered-found", n })
+  end
 end)
 
 script.on_event(defines.events.on_runtime_mod_setting_changed, function(event)
@@ -1822,6 +1834,13 @@ remote.add_interface("bulk-wagons", {
     local station, _, why = connector_spot(surface, position, true)
     return station and true or why
   end,
+  -- Marks what stands under a station, as an update does; returns how many entities.
+  scan_covered = function(entity)
+    local record = entity and entity.valid and storage.stations[entity.unit_number]
+    return record and covered.scan(record) or 0
+  end,
+  -- How many entities under a station are marked.
+  covered_count = function(entity) return covered.count(entity.unit_number) end,
   -- Moves the 2x1 connectors of 0.4 onto the station rims, as the 0.5.0 update does.
   migrate_connectors = function() migrate_connectors() end,
   -- Turns and centres a station on the rail below it, as a hand-built one would be.
