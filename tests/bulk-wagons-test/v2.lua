@@ -112,8 +112,8 @@ local function setup_fulgora(s)
   silo_inv.insert({ name = "scrap", count = 1000000 })
   f.silo_full = silo_inv.get_item_count("scrap")
   f.in_silo = connector(surface, { 18.5, -10.5 }, defines.direction.east, "input")
-  -- pointing away from the silo, as an output: it still feeds the silo
-  f.away_silo = connector(surface, { 23.5, -8.5 }, defines.direction.east, "output")
+  -- pointing away from the silo, as an output, on a free rim tile: it still feeds the silo
+  f.away_silo = connector(surface, { 23.5, -9.5 }, defines.direction.east, "output")
   f.belts_s = {}
   for i = 0, 5 do
     local belt = surface.create_entity({ name = "transport-belt", position = { 17.5 - i, -10.5 }, direction = defines.direction.east,
