@@ -1,8 +1,15 @@
 ---------------------------------------------------------------------------------------------------
-Version: 0.5.2
+Version: 0.5.3
 Date: 2026-10-30
   Bugfixes:
     - A connector built by hand before its belt could end up filling a bunker instead of emptying it, because the game turned it towards the bunker's inventory. Connectors on a bunker now always take goods out and on a silo always feed it, whichever way they are placed; wrongly turned ones are fixed on update.
+---------------------------------------------------------------------------------------------------
+Version: 0.5.2
+Date: 2026-10-30
+  Graphics:
+    - Bulk wagons tilt on rail ramps (Space Age elevated rails) like the vanilla wagons; they used to stay level.
+  Bugfixes:
+    - The goods in a loaded bulk wagon stay visible on elevated rails; the bridge used to cover them. On the ramp itself they are hidden while the wagon tilts.
 ---------------------------------------------------------------------------------------------------
 Version: 0.5.1
 Date: 2026-10-29

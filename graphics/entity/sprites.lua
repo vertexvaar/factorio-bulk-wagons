@@ -1668,5 +1668,34 @@ return {
       ["frame_count"] = 4,
       ["shift"] = { 0.0000, -1.3613 }
     }
+  },
+  ["wagon-sloped"] = {
+    ["color"] = {
+      ["files"] = { "bulk-wagon-sloped-color-1.png", "bulk-wagon-sloped-color-2.png", "bulk-wagon-sloped-color-3.png", "bulk-wagon-sloped-color-4.png" },
+      ["width"] = 462,
+      ["height"] = 537,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 5,
+      ["frame_count"] = 80,
+      ["shift"] = { 0.0000, -0.4016 }
+    },
+    ["mask"] = {
+      ["files"] = { "bulk-wagon-sloped-mask-1.png", "bulk-wagon-sloped-mask-2.png", "bulk-wagon-sloped-mask-3.png", "bulk-wagon-sloped-mask-4.png" },
+      ["width"] = 440,
+      ["height"] = 450,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 5,
+      ["frame_count"] = 80,
+      ["shift"] = { 0.0000, -0.4875 }
+    },
+    ["shadow"] = {
+      ["files"] = { "bulk-wagon-sloped-shadow-1.png", "bulk-wagon-sloped-shadow-2.png", "bulk-wagon-sloped-shadow-3.png", "bulk-wagon-sloped-shadow-4.png" },
+      ["width"] = 768,
+      ["height"] = 960,
+      ["line_length"] = 4,
+      ["lines_per_file"] = 5,
+      ["frame_count"] = 80,
+      ["shift"] = { 0.0000, -0.3000 }
+    }
   }
 }
