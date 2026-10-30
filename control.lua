@@ -1177,9 +1177,10 @@ local DEFAULT_CARGO_COLOR = { 0.6, 0.58, 0.55 }
 
 local function load_frame(wagon) return math.floor(wagon.orientation * 2 * LOAD_FRAMES + 0.5) % LOAD_FRAMES end
 
--- On elevated rails the game draws the wagon higher up: the heaps follow it there and
--- go to the elevated layers, else the bridge covers them. On a ramp the wagon tilts,
--- the heaps are rendered flat only, so they hide until the wagon is level again.
+-- On elevated rails the heaps follow the wagon up on their own (the render target is
+-- drawn where the wagon is), but must go to the elevated layers, else the bridge
+-- covers them. On a ramp the wagon tilts, the heaps are rendered flat only, so they
+-- hide until the wagon is level again.
 local function place_cargo(record, wagon)
   local draw = wagon.draw_data
   local hidden = math.abs(draw.slope) > 0.001
@@ -1188,11 +1189,10 @@ local function place_cargo(record, wagon)
     record.hidden = hidden
   end
   if hidden then return end
-  local height = draw.height
-  if record.height ~= height then
-    record.render.target = { entity = wagon, offset = { 0, -height } }
-    record.render.render_layer = height > 0 and "elevated-higher-object" or "cargo-hatch"
-    record.height = height
+  local elevated = draw.height > 0
+  if record.elevated ~= elevated then
+    record.render.render_layer = elevated and "elevated-higher-object" or "cargo-hatch"
+    record.elevated = elevated
   end
 end
 
