@@ -237,6 +237,14 @@ local function setup()
       item = ({ "iron-ore", "copper-ore", "stone" })[i] }
   end
 
+  -- Scene K: a manually driven train rolls slowly over a pit and is stopped there by
+  -- hand. Its state stays "manual control", so only noticing the halt wakes the pit.
+  rail_line(surface, true, -31, -41, 41)
+  s.wagon_k = train(surface, true, -31, -20, -13)
+  s.wagon_k.get_inventory(defines.inventory.cargo_wagon).insert({ name = "stone", count = 50 })
+  s.pit_k = surface.create_entity({ name = "bulk-unloading-pit", position = { -31, -13 }, force = "player", raise_built = true })
+  s.wagon_k.train.speed = 0.01
+
   if game.planets.vulcanus then setup_vulcanus(s) end
 
   storage.scene = s
@@ -323,6 +331,10 @@ local function check()
   local wagon_c = s.wagon_c.get_inventory(defines.inventory.cargo_wagon)
   report(count(wagon_c, "stone") == 0, "horizontal pit unloads", count(wagon_c, "stone") .. " left")
 
+  report(count(s.wagon_k.get_inventory(defines.inventory.cargo_wagon), "stone") == 0 and s.k_departed,
+    "pit unloads a train stopped by hand on it", tostring(s.k_departed))
+  report(not remote.call("bulk-wagons", "is_active", s.pit_k), "pit sleeps again after the train has left")
+
 end
 
 local function check_moving()
@@ -346,6 +358,23 @@ script.on_event(defines.events.on_tick, function(event)
     end
   end
   if age == 40 then check_moving() end
+  local s = storage.scene
+  -- scene K: rolling until tick 50, then stopped by hand; it leaves again at tick 300
+  if age < 50 then s.wagon_k.train.speed = 0.01 end
+  if age == 50 then s.wagon_k.train.speed = 0 end
+  if age == 45 then
+    report(not remote.call("bulk-wagons", "is_active", s.pit_k)
+      and count(s.wagon_k.get_inventory(defines.inventory.cargo_wagon), "stone") == 50,
+      "pit sleeps while a train rolls over it")
+    report(not remote.call("bulk-wagons", "is_active", s.aligned), "station without a train sleeps")
+  end
+  if age == 100 then
+    report(remote.call("bulk-wagons", "is_active", s.pit_k), "train halting on a pit wakes it")
+  end
+  if age == 300 then
+    s.k_departed = count(s.wagon_k.get_inventory(defines.inventory.cargo_wagon), "stone") == 0
+    s.wagon_k.train.speed = -0.3
+  end
   if age == 60 then
     local red = defines.wire_connector_id.circuit_red
     local store = storage.scene.store_g

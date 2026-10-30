@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.5.4
+Date: 2026-10-30
+  Optimizations:
+    - Stations only work while a train with bulk wagons halts on them. They used to search for a wagon every 12 ticks even with no train around; now a halting train wakes the stations under its wagons, and they go back to sleep once the train has left. Manually driven trains are noticed as well. Wagons are only checked for forbidden items and their heaps only redrawn while they stand.
+---------------------------------------------------------------------------------------------------
 Version: 0.5.3
 Date: 2026-10-30
   Bugfixes:

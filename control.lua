@@ -50,6 +50,17 @@ local function exists(name) return prototypes.entity[name] ~= nil end
 
 local function is_wagon(entity) return wagon_planet[entity.name] ~= nil end
 
+-- Keeps track of the trains with bulk wagons, which transfer_pass watches for halts.
+local function watch_train(train)
+  if not (train and train.valid) or storage.trains[train.id] then return end
+  for _, wagon in pairs(train.cargo_wagons) do
+    if is_wagon(wagon) then
+      storage.trains[train.id] = { train = train, halted = false }
+      return
+    end
+  end
+end
+
 local function planet_of(surface)
   local planet = surface.planet and surface.planet.name
   if planet_set[planet] then return planet end
@@ -67,6 +78,8 @@ local function init_storage()
   storage.drained = storage.drained or {} -- wagon unit_number -> tick a pit last took goods out
   storage.ghost_checks = storage.ghost_checks or {} -- station ghosts placed by hand, checked next tick
   storage.slots = storage.slots or {} -- silo connector unit_number -> slot entity on the next rim tile
+  storage.trains = storage.trains or {} -- train id -> { train, halted }, trains with bulk wagons
+  storage.active = storage.active or {} -- station unit_number -> true while a transfer pass looks at it
   -- the data stage reports which generated graphics exist
   local info = prototypes.mod_data["bulk-wagons-graphics"]
   storage.has_load_animation = info ~= nil and info.data.load == true
@@ -202,6 +215,7 @@ end
 local CONNECTOR_LIST = {} -- 1x1 connector names that exist, filled on init/load
 local LEGACY_CONNECTOR_LIST = {}
 local STATION_LIST = {} -- bunker and silo names that exist
+local ALL_STATION_LIST = {} -- all station names that exist, the stations of 0.3 included
 local dock_connectors -- defined with the connectors below
 
 -- The slot that holds the second tile of a silo connector.
@@ -375,6 +389,8 @@ local function register_station(entity, info)
     record.blockers = create_blockers(entity, info)
   end
   storage.stations[entity.unit_number] = record
+  -- built under a wagon that already stands still: no train halts to wake it
+  storage.active[entity.unit_number] = true
   script.register_on_object_destroyed(entity)
   circuit.attach(record)
   if record.store then circuit.on_any_built(record.store) end
@@ -390,6 +406,7 @@ local function remove_station(unit_number, buffer, removing)
   local record = storage.stations[unit_number]
   if not record then return end
   storage.stations[unit_number] = nil
+  storage.active[unit_number] = nil
   for _, key in pairs({ "overlay", "mask", "base_mask" }) do
     destroy(record, key)
   end
@@ -591,10 +608,15 @@ local function port_busy(record)
   return false
 end
 
+-- Only active stations are looked at: a train halting over them wakes them (see
+-- poll_trains), and they sleep again once no wagon stands on them and they have retracted.
 local function transfer_pass()
   local budget = math.max(1, math.floor(settings.global["bulk-wagons-transfer-rate"].value * TRANSFER_PERIOD / 60))
-  for unit_number, record in pairs(storage.stations) do
-    if not record.entity.valid then
+  for unit_number in pairs(storage.active) do
+    local record = storage.stations[unit_number]
+    if not record then
+      storage.active[unit_number] = nil
+    elseif not record.entity.valid then
       remove_station(unit_number)
     else
       local wagon = find_wagon(record)
@@ -619,13 +641,18 @@ local function transfer_pass()
         working = moved > 0 or record.base == shared.pit and not store.is_empty()
       end
       update_state(record, wagon ~= nil, working)
+      -- the belt loader of 0.3 keeps its port following the circuit condition, so it stays awake
+      if not wagon and (record.state or "idle") == "idle" and record.base ~= shared.belt_loader then
+        storage.active[unit_number] = nil
+      end
     end
   end
 end
 
 local function finish_transitions()
-  for _, record in pairs(storage.stations) do
-    if record.switch_at and game.tick >= record.switch_at and record.entity.valid then
+  for unit_number in pairs(storage.active) do
+    local record = storage.stations[unit_number]
+    if record and record.switch_at and game.tick >= record.switch_at and record.entity.valid then
       if record.state == "extend" then
         show(record, record.working and "work" or "docked")
       else
@@ -987,7 +1014,10 @@ local function on_built(event)
   end
   if is_wagon(entity) then
     if not cloned then entity = fit_wagon(entity) end
-    if entity and entity.valid then storage.wagons[entity.unit_number] = entity end
+    if entity and entity.valid then
+      storage.wagons[entity.unit_number] = entity
+      watch_train(entity.train)
+    end
     return
   end
   if entity.name == "entity-ghost" and variant_of[entity.ghost_name] and event.name == defines.events.on_built_entity then
@@ -1271,14 +1301,70 @@ local function turn_cargo()
   end
 end
 
+local function sweep_wagon(wagon)
+  purge_wagon(wagon, nil)
+  update_cargo(wagon)
+end
+
+-- Goods only go into or out of a wagon while it stands, so only halted trains are swept
+-- (and each train once more as it leaves, see poll_trains).
 local function sweep_wagons()
-  for unit_number, wagon in pairs(storage.wagons) do
-    if wagon.valid then
-      purge_wagon(wagon, nil)
+  local swept = {}
+  for _, entry in pairs(storage.trains) do
+    if entry.halted and entry.train.valid then
+      for _, wagon in pairs(entry.train.cargo_wagons) do
+        if is_wagon(wagon) then
+          sweep_wagon(wagon)
+          swept[wagon.unit_number] = true
+        end
+      end
+    end
+  end
+  -- a wagon a pit emptied shows draining heaps for a while, also after it left
+  for unit_number in pairs(storage.drained) do
+    local wagon = storage.wagons[unit_number]
+    if swept[unit_number] then
+      -- done above
+    elseif wagon and wagon.valid then
       update_cargo(wagon)
     else
       storage.wagons[unit_number] = nil
       storage.drained[unit_number] = nil
+    end
+  end
+end
+
+-- Wakes the stations under the bulk wagons of a train that has just come to a halt.
+local function dock_train(train)
+  for _, wagon in pairs(train.cargo_wagons) do
+    if is_wagon(wagon) then
+      local p = wagon.position
+      local area = { { p.x - 3.5, p.y - 3.5 }, { p.x + 3.5, p.y + 3.5 } }
+      for _, station in pairs(wagon.surface.find_entities_filtered({ name = ALL_STATION_LIST, area = area })) do
+        if storage.stations[station.unit_number] then storage.active[station.unit_number] = true end
+      end
+    end
+  end
+end
+
+-- Notices trains with bulk wagons coming to a halt or setting off. The train state alone
+-- does not tell: manually driven trains (and trains out of fuel) stop without changing it.
+local function poll_trains()
+  for id, entry in pairs(storage.trains) do
+    local train = entry.train
+    if not train.valid then
+      storage.trains[id] = nil
+    elseif train.speed == 0 then
+      if not entry.halted then
+        entry.halted = true
+        dock_train(train)
+      end
+    elseif entry.halted then
+      entry.halted = false
+      -- what went in or out up to the last moment
+      for _, wagon in pairs(train.cargo_wagons) do
+        if is_wagon(wagon) then sweep_wagon(wagon) end
+      end
     end
   end
 end
@@ -1299,7 +1385,7 @@ local function collect_wagon_names()
   for name in pairs(wagon_planet) do
     if exists(name) then wagon_names[#wagon_names + 1] = name end
   end
-  for _, list in pairs({ CONNECTOR_LIST, LEGACY_CONNECTOR_LIST, STATION_LIST }) do
+  for _, list in pairs({ CONNECTOR_LIST, LEGACY_CONNECTOR_LIST, STATION_LIST, ALL_STATION_LIST }) do
     for i = #list, 1, -1 do
       list[i] = nil
     end
@@ -1312,6 +1398,7 @@ local function collect_wagon_names()
   end
   for name, info in pairs(variant_of) do
     if not shared.is_legacy(info.base) and exists(name) then STATION_LIST[#STATION_LIST + 1] = name end
+    if exists(name) then ALL_STATION_LIST[#ALL_STATION_LIST + 1] = name end
   end
 end
 
@@ -1572,6 +1659,17 @@ script.on_configuration_changed(function()
   for _, record in pairs(storage.stations) do
     if record.entity.valid and not shared.is_legacy(record.base) then dock_connectors(record) end
   end
+  -- 0.5.4: stations only work while a train halts on them; the first passes put the idle ones to sleep
+  for unit_number in pairs(storage.stations) do
+    storage.active[unit_number] = true
+  end
+  for unit_number, wagon in pairs(storage.wagons) do
+    if wagon.valid then
+      watch_train(wagon.train)
+    else
+      storage.wagons[unit_number] = nil
+    end
+  end
 end)
 
 script.on_event(defines.events.on_runtime_mod_setting_changed, function(event)
@@ -1603,6 +1701,9 @@ script.on_event(removed_events, function(event)
   markers.redraw_all()
 end)
 script.on_event(defines.events.on_object_destroyed, on_object_destroyed)
+-- coupling and uncoupling make new trains; a train changing state is caught in case it was missed
+script.on_event(defines.events.on_train_created, function(event) watch_train(event.train) end)
+script.on_event(defines.events.on_train_changed_state, function(event) watch_train(event.train) end)
 
 script.on_event("bulk-wagons-rotate", function(event) rotate_cursor(event, 1) end)
 script.on_event("bulk-wagons-reverse-rotate", function(event) rotate_cursor(event, -1) end)
@@ -1659,7 +1760,10 @@ end)
 
 script.on_nth_tick(3600, circuit.expire_pending)
 
-script.on_nth_tick(TRANSFER_PERIOD, transfer_pass)
+script.on_nth_tick(TRANSFER_PERIOD, function()
+  poll_trains()
+  transfer_pass()
+end)
 script.on_nth_tick(8, finish_transitions)
 script.on_nth_tick(SWEEP_PERIOD, sweep_wagons)
 script.on_nth_tick(2, turn_cargo)
@@ -1694,6 +1798,10 @@ remote.add_interface("bulk-wagons", {
     return record and record.store
   end,
   is_allowed = function(name) return storage.allowed[name] == true end,
+  -- Whether the transfer pass looks at a station (a train halts on it, or it is still retracting).
+  is_active = function(entity)
+    return entity and entity.valid and storage.active[entity.unit_number] == true or false
+  end,
   -- Station colour: get, or set with a colour (nil resets).
   station_color = function(entity, color, reset)
     local record = entity and entity.valid and storage.stations[entity.unit_number]
