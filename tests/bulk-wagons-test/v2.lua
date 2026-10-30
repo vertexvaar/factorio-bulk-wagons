@@ -112,6 +112,8 @@ local function setup_fulgora(s)
   silo_inv.insert({ name = "scrap", count = 1000000 })
   f.silo_full = silo_inv.get_item_count("scrap")
   f.in_silo = connector(surface, { 18.5, -10.5 }, defines.direction.east, "input")
+  -- pointing away from the silo, as an output: it still feeds the silo
+  f.away_silo = connector(surface, { 23.5, -8.5 }, defines.direction.east, "output")
   f.belts_s = {}
   for i = 0, 5 do
     local belt = surface.create_entity({ name = "transport-belt", position = { 17.5 - i, -10.5 }, direction = defines.direction.east,
@@ -173,24 +175,25 @@ function v2.setup(s, report_fn)
   end
   -- a connector off the rim: next to the bunker's end, it must not count as docked
   s.end_connector = connector(surface, { xb + 2.5, -15.5 }, defines.direction.north, "output")
-  -- whichever way it is built, the arrow decides: away from the station = output; along
-  -- the track the bunker's way (output)
+  -- whichever way it is built, a connector on a bunker takes goods out
   s.arrow_ok = true
   s.arrow_detail = {}
   local cases = {
     { defines.direction.west, "input", "output", defines.direction.west },
     { defines.direction.west, "output", "output", defines.direction.west },
-    { defines.direction.east, "output", "input", defines.direction.east },
+    -- pointing at the bunker, as the game turns one built by hand before its belt
+    { defines.direction.east, "output", "output", defines.direction.west },
+    { defines.direction.east, "input", "output", defines.direction.west },
     { defines.direction.north, "input", "output", defines.direction.west },
   }
   for k, case in pairs(cases) do
     -- connectors on the west side take the rim tile north of them as well
-    local c = connector(surface, { xb - 3.5, k < 4 and -12.5 or -8.5 }, case[1], case[2])
+    local c = connector(surface, { xb - 3.5, k < 5 and -12.5 or -8.5 }, case[1], case[2])
     local ok = c and c.loader_type == case[3] and c.direction == case[4]
       and remote.call("bulk-wagons", "connector_docked", c)
     s.arrow_ok = s.arrow_ok and ok
     s.arrow_detail[#s.arrow_detail + 1] = c and (c.direction .. c.loader_type .. tostring(c.loader_container and c.loader_container.name)) or "none"
-    if c and k < 3 then c.destroy({ raise_destroy = true }) end
+    if c and k < 4 then c.destroy({ raise_destroy = true }) end
   end
   -- the west side now holds out_west and two more: a fourth is refused, the east side has room
   s.west_full = remote.call("bulk-wagons", "connector_allowed", surface, { x = xb - 3.5, y = -8.5 })
@@ -285,7 +288,7 @@ function v2.check(s)
     "connector without a belt holds the ore, nothing on the ground", held .. " held")
   report(s.out_east.loader_container ~= nil and s.out_east.loader_container == remote.call("bulk-wagons", "get_store", s.bunker),
     "connector docks onto the bunker inventory")
-  report(s.arrow_ok, "the arrow sets input or output, along the track the station's way", table.concat(s.arrow_detail, " "))
+  report(s.arrow_ok, "a connector on a bunker always takes goods out", table.concat(s.arrow_detail, " "))
   report(remote.call("bulk-wagons", "connector_docked", s.out_east) and not remote.call("bulk-wagons", "connector_docked", s.end_connector),
     "only the rim counts as docking point")
   report(s.west_full == "bulk-wagons.side-full" and s.east_free == true and s.grating == "bulk-wagons.needs-station",
@@ -371,7 +374,7 @@ function v2.check(s)
     local left = f.wagon_v.get_inventory(defines.inventory.cargo_wagon).get_item_count("scrap")
     local out = on(f.belts_v, "scrap")
     report(left == 0 and out > 0, "Fulgora bunker unloads scrap onto the belt", describe(f.bunker_v, f.out_v, f.wagon_v) .. " belt=" .. out)
-    local details, ok = {}, f.train_h == 4
+    local details, ok = {}, true
     for k = 1, 2 do
       local wagon = f.wagons_h[k]
       ok = ok and wagon.get_inventory(defines.inventory.cargo_wagon).get_item_count("scrap") == 0
@@ -380,6 +383,10 @@ function v2.check(s)
     local out_h = on(f.belts_h, "scrap")
     report(ok and out_h > 0, "two Fulgora bunkers on a horizontal track unload scrap",
       "carriages=" .. f.train_h .. " " .. table.concat(details, " | ") .. " belts=" .. out_h)
+    local away = f.away_silo
+    report(away and away.valid and away.loader_type == "input" and away.direction == defines.direction.west
+      and remote.call("bulk-wagons", "connector_docked", away), "a connector on a silo always feeds it",
+      away and away.valid and (away.loader_type .. " " .. away.direction) or "none")
     local loaded = f.silo_wagon.get_inventory(defines.inventory.cargo_wagon).get_item_count("scrap")
     local belt_after = on(f.belts_s, "scrap")
     report(loaded > 0 and belt_after < f.belt_before, "a full silo's input connector takes scrap again once the wagon loads",

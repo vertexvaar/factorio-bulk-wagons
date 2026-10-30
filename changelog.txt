@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.5.2
+Date: 2026-10-30
+  Bugfixes:
+    - A connector built by hand before its belt could end up filling a bunker instead of emptying it, because the game turned it towards the bunker's inventory. Connectors on a bunker now always take goods out and on a silo always feed it, whichever way they are placed; wrongly turned ones are fixed on update.
+---------------------------------------------------------------------------------------------------
 Version: 0.5.1
 Date: 2026-10-29
   Graphics:

@@ -811,22 +811,15 @@ local function rebuild_loader(old, spec)
   return created
 end
 
--- Turns a connector across its side, belt outward: the arrow decides the way the goods
--- go (pointing away from the station: output). One built along the track does what its
--- station does. It also takes the look of its station (elevator or chute). Returns the
--- connector, which may be a new entity.
+-- Turns a connector across its side, belt outward: on a bunker it takes goods out, on a
+-- silo it fills it in, however it was built (Factorio turns a loader placed by hand towards
+-- the station's inventory when no belt is there yet). It also takes the look of its
+-- station (elevator or chute). Returns the connector, which may be a new entity.
 local function fit_connector(entity, station, side)
   local info = CONNECTORS[entity.name]
   local outward = shared.outward(station.variant, side)
-  local direction, kind = entity.direction, nil
-  if direction == outward then
-    kind = "output"
-  elseif direction == OPPOSITE[outward] then
-    kind = "input"
-  else
-    kind = UNLOADS[station.base] and "output" or "input"
-    direction = kind == "output" and outward or OPPOSITE[outward]
-  end
+  local kind = UNLOADS[station.base] and "output" or "input"
+  local direction = kind == "output" and outward or OPPOSITE[outward]
   local name = shared.connector_name(info.def, station.base)
   -- writing a loader's type also turns it round, and it does not turn sideways, so a
   -- connector that needs another look, direction or type is built anew in its place
@@ -1579,6 +1572,10 @@ script.on_configuration_changed(function()
   recover_spilled()
   refit_blockers()
   migrate_connectors()
+  -- 0.5.2: connectors on a bunker always take goods out, on a silo always fill it in
+  for _, record in pairs(storage.stations) do
+    if record.entity.valid and not shared.is_legacy(record.base) then dock_connectors(record) end
+  end
 end)
 
 script.on_event(defines.events.on_runtime_mod_setting_changed, function(event)
