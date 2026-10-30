@@ -1,10 +1,10 @@
 {
   "name": "bulk-wagons",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "title": "Bulk Wagons",
   "author": "vertexvaar",
   "homepage": "https://github.com/vertexvaar/factorio-bulk-wagons",
   "factorio_version": "2.1",
   "description": "Bulk wagons for ores and other bulk goods, with an unloading bunker and a loading silo that serve a whole wagon, linked to belts by connectors in every belt tier.",
-  "dependencies": ["base >= 2.1.0", "? space-age"]
+  "dependencies": ["base >= 2.1.0", "? space-age", "? elevated-rails"]
 }

@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.5.2
+Date: 2026-10-30
+  Graphics:
+    - Bulk wagons tilt on rail ramps (Space Age elevated rails) like the vanilla wagons; they used to stay level.
+  Bugfixes:
+    - The goods in a loaded bulk wagon stay visible on elevated rails; the bridge used to cover them. On the ramp itself they are hidden while the wagon tilts.
+---------------------------------------------------------------------------------------------------
 Version: 0.5.1
 Date: 2026-10-29
   Graphics:
