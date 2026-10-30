@@ -79,6 +79,15 @@ script.on_event(defines.events.on_tick, function(event)
   end
   if storage.done then return end
   storage.done = true
+  -- items lying on the ground (spilled while the copy loaded) would litter the pictures
+  local removed = 0
+  for _, surface in pairs(game.surfaces) do
+    for _, item in pairs(surface.find_entities_filtered({ type = "item-entity" })) do
+      item.destroy()
+      removed = removed + 1
+    end
+  end
+  log("BULKSHOTS removed " .. removed .. " items from the ground")
   for _, shot in pairs(plan()) do
     game.take_screenshot({
       surface = shot.surface,
