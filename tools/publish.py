@@ -1,12 +1,15 @@
-"""Uploads a new release of the mod to mods.factorio.com.
+"""Publishes or updates the mod on mods.factorio.com.
 
 Reads the API key from FACTORIO_API_KEY (process or Windows user environment). The key needs the
-ModPortal scope for uploading mods.
+ModPortal scopes for uploading, publishing and editing mods.
 
 Usage:
-  python tools/package.py
+  python tools/publish.py publish        first release: creates the mod page with description and images
   python tools/publish.py upload         uploads dist/<name>_<version>.zip as a new release
+  python tools/publish.py details        updates description, category, tags, license and source link
+  python tools/publish.py images         uploads the gallery images and sets their order
 """
+import hashlib
 import json
 import os
 import sys
@@ -17,6 +20,12 @@ import uuid
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 API = "https://mods.factorio.com/api/v2/mods/"
 INFO = json.load(open(os.path.join(ROOT, "info.json"), encoding="utf-8"))
+SOURCE = INFO["homepage"]
+CATEGORY = "content"
+LICENSE = "default_mit"
+TAGS = ["trains", "logistics"]
+PORTAL = os.path.join(ROOT, "previews", "portal")
+IMAGES = sorted(os.path.join("previews", "portal", f) for f in os.listdir(PORTAL)) if os.path.isdir(PORTAL) else []
 
 
 def api_key():
@@ -61,12 +70,53 @@ def zip_path():
     return path
 
 
+def description():
+    return open(os.path.join(ROOT, "portal", "description.md"), encoding="utf-8").read()
+
+
+def publish():
+    upload_url = request(API + "init_publish", {"mod": INFO["name"]})["upload_url"]
+    result = request(upload_url, {"description": description(), "category": CATEGORY, "license": LICENSE,
+                                  "source_url": SOURCE}, {"file": zip_path()}, auth=False)
+    print("published:", result.get("url", result))
+
+
 def upload():
     upload_url = request(API + "releases/init_upload", {"mod": INFO["name"]})["upload_url"]
     print("uploaded:", request(upload_url, files={"file": zip_path()}, auth=False))
 
 
+def details():
+    result = request(API + "edit_details", {"mod": INFO["name"], "description": description(), "category": CATEGORY,
+                                            "license": LICENSE, "source_url": SOURCE, "tags": TAGS})
+    print("details:", result.get("success", result))
+
+
+def portal_images():
+    """IDs of the images the mod page has already; an image's ID is the SHA1 of its file."""
+    try:
+        with urllib.request.urlopen("https://mods.factorio.com/api/mods/%s/full" % INFO["name"]) as r:
+            return {image["id"] for image in json.loads(r.read().decode()).get("images", [])}
+    except urllib.error.HTTPError:
+        return set()
+
+
+def images():
+    # the portal refuses an image it has already, so only new ones are uploaded
+    existing = portal_images()
+    ids = []
+    for image in IMAGES:
+        image_id = hashlib.sha1(open(os.path.join(ROOT, image), "rb").read()).hexdigest()
+        if image_id not in existing:
+            upload_url = request(API + "images/add", {"mod": INFO["name"]})["upload_url"]
+            image_id = request(upload_url, files={"image": os.path.join(ROOT, image)}, auth=False)["id"]
+        ids.append(image_id)
+    print("images:", request(API + "images/edit", {"mod": INFO["name"], "images": ",".join(ids)}).get("success"))
+
+
 if __name__ == "__main__":
-    if sys.argv[1:] != ["upload"]:
+    actions = {"publish": [publish, details, images], "upload": [upload], "details": [details], "images": [images]}
+    if len(sys.argv) != 2 or sys.argv[1] not in actions:
         sys.exit(__doc__)
-    upload()
+    for action in actions[sys.argv[1]]:
+        action()

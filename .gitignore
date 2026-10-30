@@ -5,3 +5,5 @@ tools/blender/out/
 dist/
 tools/blender/scenes/
 tests/.env-probe/
+tests/.env-saveshots/
+previews/saveshots/
