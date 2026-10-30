@@ -3,8 +3,12 @@
 The save and the player's mods are copied into tests/.env-probe; the original save is
 never opened or written. The probe mod logs every connector (BULKPROBE lines).
 
-Usage: python tests/probe.py <save name or path> [path-to-factorio.exe]
+With --repo the mod from this repository replaces the player's bulk-wagons, so the
+update (on_configuration_changed) runs on the copy before the probe.
+
+Usage: python tests/probe.py [--repo] <save name or path> [path-to-factorio.exe]
 """
+import glob
 import json
 import os
 import shutil
@@ -18,15 +22,31 @@ USER = os.path.join(os.environ.get("APPDATA", ""), "Factorio")
 
 
 def main():
-    if len(sys.argv) < 2:
+    args = sys.argv[1:]
+    repo = "--repo" in args
+    args = [a for a in args if a != "--repo"]
+    if not args:
         sys.exit(__doc__)
-    save = sys.argv[1]
+    save = args[0]
     if not os.path.exists(save):
         save = os.path.join(USER, "saves", save if save.endswith(".zip") else save + ".zip")
-    exe = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_EXE
+    exe = args[1] if len(args) > 1 else DEFAULT_EXE
     shutil.rmtree(ENV, ignore_errors=True)
     mods = os.path.join(ENV, "mods")
     shutil.copytree(os.path.join(USER, "mods"), mods)
+    if repo:
+        sys.path.insert(0, os.path.join(ROOT, "tests"))
+        from run import MOD_FILES, MOD_DIRS
+        for old in glob.glob(os.path.join(mods, "bulk-wagons_*.zip")):
+            os.remove(old)
+        target = os.path.join(mods, "bulk-wagons")
+        shutil.rmtree(target, ignore_errors=True)
+        os.makedirs(target)
+        for f in MOD_FILES:
+            if os.path.exists(os.path.join(ROOT, f)):
+                shutil.copy(os.path.join(ROOT, f), target)
+        for d in MOD_DIRS:
+            shutil.copytree(os.path.join(ROOT, d), os.path.join(target, d))
     shutil.copytree(os.path.join(ROOT, "tests", "bulk-wagons-probe"), os.path.join(mods, "bulk-wagons-probe"))
     with open(os.path.join(mods, "mod-list.json")) as f:
         mod_list = json.load(f)
