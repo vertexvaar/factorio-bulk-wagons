@@ -244,6 +244,20 @@ function v2.setup(s, report_fn)
   end
   s.old_loader = legacy("bulk-loading-station", -2)
 
+  -- a bunker that grew over belts and an inserter beside it (the 0.5.0 update): they get marked
+  local xu = X0 + 11
+  rails(surface, xu, 31, 49)
+  s.cover = remote.call("bulk-wagons", "align_station",
+    surface.create_entity({ name = "bulk-unloading-bunker", position = { xu, 40 }, force = "player" }))
+  local c = s.cover.position
+  s.cover_belts = {}
+  for _, dy in pairs({ -0.5, 0.5 }) do
+    s.cover_belts[#s.cover_belts + 1] = surface.create_entity({ name = "transport-belt", position = { c.x + 3.5, c.y + dy },
+      direction = defines.direction.north, force = "player" })
+  end
+  surface.create_entity({ name = "inserter", position = { c.x - 3.5, c.y + 0.5 }, direction = defines.direction.east, force = "player" })
+  s.cover_found = remote.call("bulk-wagons", "scan_covered", s.cover)
+
   if game.planets.fulgora then setup_fulgora(s) end
 end
 
@@ -261,6 +275,8 @@ function v2.after_setup(s)
   surface.spill_item_stack({ position = { s.silo.position.x + 6, s.silo.position.y }, stack = { name = "coal", count = 500 } })
   remote.call("bulk-wagons", "recover_spilled", { { s.silo.position.x - 5, -30 }, { s.silo.position.x + 5, 10 } })
   s.recovered = remote.call("bulk-wagons", "get_inventory", s.silo).get_item_count("coal") - s.recovered_before
+  -- one covered belt is mined: its sign goes
+  s.cover_belts[1].destroy()
   -- migrate on demand (a fresh game counts as migrated)
   remote.call("bulk-wagons", "migrate_legacy", { { X0 + 35, -60 }, { X0 + 60, 60 } })
   remote.call("bulk-wagons", "migrate_connectors")
@@ -272,6 +288,21 @@ function v2.check(s)
   report(g and g.valid and g.ghost_name == "bulk-loading-silo" and g.position.x == X0 + 61 and g.position.y == -11,
     "a hand-placed ghost snaps onto the wagon slot and turns to the rail",
     g and g.valid and (g.ghost_name .. " " .. serpent.line(g.position)) or "gone")
+  local function signs()
+    local n = 0
+    for _, object in pairs(rendering.get_all_objects("bulk-wagons")) do
+      if object.type == "sprite" and object.sprite == "utility/warning_icon" then n = n + 1 end
+    end
+    return n
+  end
+  local left = s.cover.valid and remote.call("bulk-wagons", "covered_count", s.cover) or -1
+  report(s.cover_found == 3 and left == 2 and signs() == 2, "belts and buildings under a bunker's rim are marked until mined",
+    string.format("found=%d left=%d signs=%d", s.cover_found, left, signs()))
+  local box = remote.call("bulk-wagons", "get_store", s.cover).prototype.selection_box
+  report(box.right_bottom.x == 3 and s.cover.prototype.selection_box.right_bottom.x == 3,
+    "the mouse takes only the middle 6 tiles of a bunker", serpent.line(box))
+  s.cover.destroy({ raise_destroy = true })
+  report(signs() == 0, "the signs go with the bunker", signs() .. " left")
   local xb = X0 + 1
   report(s.bunker and s.bunker.valid and s.bunker.position.y == -11 and s.bunker.position.x == xb,
     "bunker snaps onto the wagon slot of the train stop", s.bunker and s.bunker.valid and serpent.line(s.bunker.position) or "gone")

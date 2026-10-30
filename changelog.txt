@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.5.5
+Date: 2026-10-30
+  Bugfixes:
+    - Since 0.5.0 the bunker is 8 tiles wide, so on update it could end up over belts that ran beside the old one. They kept working but could only be removed with a deconstruction planner. The mouse now only takes the middle 6 tiles of the bunker, so belts under its rim can be mined and turned by hand again, and the update marks every belt or building under a bunker or silo with a warning sign and a map tag until it is gone.
+---------------------------------------------------------------------------------------------------
 Version: 0.5.4
 Date: 2026-10-30
   Optimizations:

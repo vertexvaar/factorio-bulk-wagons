@@ -172,7 +172,10 @@ local function wagon_station(def)
     for variant = 1, shared.variant_count_of(def.name) do
       local name = shared.variant_name(def.name, variant, planet)
       local hw, hh = size[1] / 2, size[2] / 2
-      if not shared.rail_is_vertical(variant) then hw, hh = hh, hw end
+      -- the mouse only takes the middle 6 tiles across the track: belts under the rim of a
+      -- bunker that grew over them on update (see covered.lua) can still be mined and turned
+      local sw, sh = math.min(hw, 3), hh
+      if not shared.rail_is_vertical(variant) then hw, hh, sw, sh = hh, hw, sh, sw end
       local picture = graphics.station_picture(def.sprite, variant, planet)
         or {
           filename = gfx .. def.placeholder .. "-" .. variant .. ".png",
@@ -193,13 +196,14 @@ local function wagon_station(def)
         corpse = "big-remnants",
         dying_explosion = "big-explosion",
         collision_box = { { -hw + 0.1, -hh + 0.1 }, { hw - 0.1, hh - 0.1 } },
-        selection_box = { { -hw, -hh }, { hw, hh } },
+        selection_box = { { -sw, -sh }, { sw, sh } },
         collision_mask = station_mask_v2,
         render_layer = def.render_layer,
         tall = def.tall,
         picture = picture,
       }
       local store = window_entity(def, shared.store_name(def.name, variant, planet), hw, hh, { 0, 0 })
+      store.selection_box = { { -sw, -sh }, { sw, sh } }
       -- hidden with the tall buildings, so the wagon under the silo can be clicked
       store.tall = def.tall
       -- as big as the three stations it replaces, so their goods fit on update
