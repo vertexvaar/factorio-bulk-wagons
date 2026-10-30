@@ -1,0 +1,9 @@
+{
+  "name": "bulk-wagons-saveshots",
+  "version": "0.0.1",
+  "title": "Bulk Wagons save screenshots",
+  "author": "vertexvaar",
+  "factorio_version": "2.1",
+  "description": "Takes screenshots of the stations in a copy of a save. Development only.",
+  "dependencies": ["bulk-wagons"]
+}
